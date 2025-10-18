@@ -1,13 +1,4 @@
-{
-  "name": "Darts Counter",
-  "short_name": "Darts",
-  "start_url": "/",
-  "scope": "/",
-  "display": "standalone",
-  "background_color": "#0a0a0a",
-  "theme_color": "#f59e0b",
-  "icons": [
-    { "src": "/icons/app-192-v2.png?v=1", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icons/app-512-v2.png?v=1", "sizes": "512x512", "type": "image/png" }
-  ]
-}
+"icons": [
+  { "src": "https://dartscounter.pages.dev/icons/app-192-v2.png?v=2", "sizes": "192x192", "type": "image/png" },
+  { "src": "https://dartscounter.pages.dev/icons/app-512-v2.png?v=2", "sizes": "512x512", "type": "image/png" }
+]
