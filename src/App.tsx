@@ -637,6 +637,43 @@ function Header({ onInstall }: { onInstall: () => void }) {
   }) {
     return (
       <section style={{ display: "grid", gap: 24 }}>
+         {/* HEADER AVEC LOGO + TITRE */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 16,
+            marginBottom: 8,
+          }}
+        >
+          <img
+            src="/LOGO DARTS COUNTER.png"
+            alt="Darts Counter Logo"
+            style={{
+              width: 150,
+              height: 150,
+              objectFit: "contain",
+              filter: "drop-shadow(0 0 8px rgba(245,158,11,.35))",
+            }}
+          />
+          <div style={{ textAlign: "left" }}>
+            <div style={{ fontSize: 18, opacity: 0.9 }}>Bienvenue</div>
+            <div
+              style={{
+                fontWeight: 900,
+                fontSize: 34,
+                letterSpacing: 0.3,
+                marginTop: 2,
+                color: "var(--c-primary)",
+                textShadow:
+                  "0 3px 0 rgba(0,0,0,.55), 0 0 18px rgba(245,158,11,.25), 0 10px 16px rgba(0,0,0,.35)",
+              }}
+            >
+              DARTS COUNTER
+            </div>
+          </div>
+        </div>
   
         {/* === BOUTONS PRINCIPAUX === */}
         <div
