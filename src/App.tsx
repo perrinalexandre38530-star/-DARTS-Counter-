@@ -1519,12 +1519,12 @@ function GamesHub({
 }
 
 /* =========================================
-   ProfilesPage — inclut le compte comme profil jouable
+   ProfilesPage — compte affiché en haut, masqué dans la liste
    ========================================= */
    function ProfilesPage({
     profiles, setProfiles, teams, setTeams, events,
     account, loggedIn,
-    onOpenAccount,                 // ✅ pour router vers la page Compte
+    onOpenAccount,
   }: {
     profiles: Profile[];
     setProfiles: (updater: any) => void;
@@ -1535,42 +1535,46 @@ function GamesHub({
     loggedIn: boolean;
     onOpenAccount?: () => void;
   }) {
-    // === Sync: injecte/MAJ automatiquement le profil du compte (jouable) ===
+    // 1) Sync du compte vers un profil "acc:..."
     useEffect(() => {
       if (!loggedIn || !account) return;
-      const pid = `acc:${account.id}`; // id spécial et stable
+      const pid = `acc:${account.id}`;
       setProfiles((arr: Profile[]) => {
         const exists = arr.some(p => p.id === pid);
-        const nextProfile: Profile = {
+        const next: Profile = {
           id: pid,
           name: account.name,
-          avatarDataUrl: (account as any).avatarDataUrl,
+          avatarDataUrl: account.avatarDataUrl,
           stats: arr.find(p => p.id === pid)?.stats ?? { games: 0, legs: 0, sets: 0, darts: 0 },
         };
-        return exists
-          ? arr.map(p => (p.id === pid ? nextProfile : p))
-          : [...arr, nextProfile];
+        return exists ? arr.map(p => (p.id === pid ? next : p)) : [...arr, next];
       });
-    // on suit finement les champs qui peuvent changer
-    }, [loggedIn, account?.id, account?.name, (account as any)?.avatarDataUrl, setProfiles]);
+    }, [loggedIn, account?.id, account?.name, account?.avatarDataUrl, setProfiles]);
   
-    const [selectedId, setSelectedId] = useState<string>(() => profiles[0]?.id || "");
-    const selected = useMemo(
-      () => profiles.find((p) => p.id === selectedId),
-      [profiles, selectedId]
+    // 2) Liste SANS le profil-compte
+    const displayProfiles = React.useMemo(
+      () => profiles.filter(p => !p.id.startsWith("acc:")),
+      [profiles]
     );
   
-    const [newName, setNewName] = useState("");
+    // 3) Sélection par défaut = 1er profil NON-compte
+    const [selectedId, setSelectedId] = React.useState<string>(() => displayProfiles[0]?.id || "");
+    React.useEffect(() => {
+      if (!selectedId || !displayProfiles.some(p => p.id === selectedId)) {
+        setSelectedId(displayProfiles[0]?.id || "");
+      }
+    }, [displayProfiles, selectedId]);
+  
+    const selected = React.useMemo(
+      () => displayProfiles.find((p) => p.id === selectedId),
+      [displayProfiles, selectedId]
+    );
+  
+    const [newName, setNewName] = React.useState("");
   
     async function uploadAvatar(f?: File) {
       if (!selected || !f) return;
       const url = await fileToDataURL(f);
-  
-      // Si c'est le profil-compte, on renvoie vers la page compte (source de vérité)
-      if (selected.id.startsWith("acc:")) {
-        onOpenAccount?.();
-        return;
-      }
       setProfiles((arr: Profile[]) =>
         arr.map((p) => (p.id === selected.id ? { ...p, avatarDataUrl: url } : p))
       );
@@ -1584,23 +1588,37 @@ function GamesHub({
       setSelectedId(p.id);
     }
   
-    const isAccountProfile = !!selected && selected.id.startsWith("acc:");
-  
     return (
       <section style={{ display: "grid", gap: 12 }}>
-        <div className="hide-sm">
-          <SectionTabs
-            tabs={[
-              { key: "list", label: "Profils", icon: "user" },
-              { key: "stats", label: "Stats (bêta)", icon: "chart" },
-            ]}
-            value={"list"}
-            onChange={() => {}}
-          />
-        </div>
+        {/* === Bloc "Votre compte" conservé en haut === */}
+        {loggedIn && account && (
+          <button
+            onClick={onOpenAccount}
+            title="Ouvrir la page Compte"
+            style={{
+              width: 280,
+              textAlign: "left",
+              border: "1px solid rgba(255,255,255,.12)",
+              background:
+                "linear-gradient(180deg, rgba(245,158,11,.12), rgba(10,10,12,.55))",
+              borderRadius: 12,
+              padding: 10,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              cursor: "pointer",
+            }}
+          >
+            <Avatar name={account.name} src={account.avatarDataUrl} size={70} />
+            <div>
+              <div style={{ fontWeight: 900, color: "var(--c-primary)" }}>Votre compte</div>
+              <div style={{ opacity: 0.85 }}>{account.name}</div>
+            </div>
+          </button>
+        )}
   
         <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 12 }}>
-          {/* ========= Colonne gauche : Compte + création + liste ========= */}
+          {/* Colonne gauche : création + liste (sans le compte) */}
           <div
             style={{
               border: "1px solid rgba(255,255,255,.08)",
@@ -1609,43 +1627,7 @@ function GamesHub({
               padding: 10,
             }}
           >
-            {/* ✅ Bloc “Votre compte” cliquable si connecté */}
-            {loggedIn && account && (
-              <button
-                onClick={onOpenAccount}
-                title="Ouvrir la page Compte"
-                style={{
-                  width: "100%",
-                  textAlign: "left",
-                  border: "1px solid rgba(255,255,255,.12)",
-                  background:
-                    "linear-gradient(180deg, rgba(245,158,11,.12), rgba(10,10,12,.55))",
-                  borderRadius: 12,
-                  padding: 10,
-                  marginBottom: 10,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  cursor: "pointer",
-                }}
-              >
-                <Avatar
-                  name={account.name}
-                  src={(account as any).avatarDataUrl}
-                  size={70}
-                />
-                <div style={{ display: "grid" }}>
-                  <div style={{ fontWeight: 900, color: "var(--c-primary)" }}>
-                    Votre compte
-                  </div>
-                  <div style={{ opacity: 0.85 }}>{account.name}</div>
-                  <div style={{ fontSize: 12, opacity: 0.7 }}>
-                  </div>
-                </div>
-              </button>
-            )}
-  
-            {/* Création rapide d’un profil local */}
+            {/* Création rapide */}
             <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
               <input
                 value={newName}
@@ -1663,101 +1645,61 @@ function GamesHub({
               />
               <button
                 onClick={addProfile}
-                aria-label="Ajouter un joueur"
                 title="Ajouter un joueur"
-                onMouseEnter={(e) => (e.currentTarget.style.filter = "brightness(1.1)")}
-                onMouseLeave={(e) => (e.currentTarget.style.filter = "none")}
                 style={{
-                  width: 32,
-                  height: 32,
-                  minWidth: 32,
-                  minHeight: 32,
-                  borderRadius: 9999,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "var(--c-primary)",
-                  color: "#111",
-                  border: "1px solid rgba(0,0,0,.25)",
-                  boxShadow: "0 6px 14px rgba(0,0,0,.35)",
-                  lineHeight: 1,
-                  padding: 0,
-                  cursor: "pointer",
-                  fontWeight: 800,
+                  width: 32, height: 32, minWidth: 32, minHeight: 32,
+                  borderRadius: 9999, display: "flex", alignItems: "center", justifyContent: "center",
+                  background: "var(--c-primary)", color: "#111",
+                  border: "1px solid rgba(0,0,0,.25)", boxShadow: "0 6px 14px rgba(0,0,0,.35)",
+                  fontWeight: 800, cursor: "pointer",
                 }}
               >
-                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    aria-hidden="true"
-                    style={{ opacity: 0.9 }}
-                  >
-                    <path d="M12 12c2.761 0 5-2.686 5-6s-2.239-6-5-6-5 2.686-5 6 2.239 6 5 6zm0 2c-4.418 0-8 2.239-8 5v3h16v-3c0-2.761-3.582-5-8-5z"/>
-                  </svg>
-                  <span>+</span>
-                </span>
+                +
               </button>
             </div>
   
-            {/* Liste des profils (le profil-compte apparaît avec un badge) */}
+            {/* Liste SANS le profil-compte */}
             <div style={{ display: "grid", gap: 6, maxHeight: 380, overflow: "auto", paddingRight: 4 }}>
-              {profiles.map((p) => {
-                const isAcc = p.id.startsWith("acc:");
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => setSelectedId(p.id)}
-                    style={{
-                      textAlign: "left",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: 8,
-                      borderRadius: 10,
-                      border: "1px solid rgba(255,255,255,.08)",
-                      background:
-                        selectedId === p.id
-                          ? "radial-gradient(120px 60px at 50% -20%, rgba(245,158,11,.35), rgba(245,158,11,.08))"
-                          : "#0e0e10",
-                      color: selectedId === p.id ? "var(--c-primary)" : "#e7e7e7",
-                      fontWeight: selectedId === p.id ? 800 : 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    <Avatar name={p.name} src={p.avatarDataUrl} />
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span>{p.name}</span>
-                        {isAcc && (
-                          <span
-                            style={{
-                              fontSize: 11,
-                              fontWeight: 900,
-                              color: "#111",
-                              background: "var(--c-primary)",
-                              border: "1px solid rgba(0,0,0,.25)",
-                              borderRadius: 999,
-                              padding: "2px 6px",
-                            }}
-                          >
-                            Compte
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: 12, opacity: 0.7 }}>
-                        {p.stats?.games ?? 0} parties · {p.stats?.legs ?? 0} legs · {p.stats?.darts ?? 0} darts
-                      </div>
+              {displayProfiles.length === 0 && (
+                <div style={{ opacity: .7, padding: 8 }}>
+                  Aucun profil local. Crée un profil ou utilise ton compte.
+                </div>
+              )}
+  
+              {displayProfiles.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setSelectedId(p.id)}
+                  style={{
+                    textAlign: "left",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: 8,
+                    borderRadius: 10,
+                    border: "1px solid rgba(255,255,255,.08)",
+                    background:
+                      selectedId === p.id
+                        ? "radial-gradient(120px 60px at 50% -20%, rgba(245,158,11,.35), rgba(245,158,11,.08))"
+                        : "#0e0e10",
+                    color: selectedId === p.id ? "var(--c-primary)" : "#e7e7e7",
+                    fontWeight: selectedId === p.id ? 800 : 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  <Avatar name={p.name} src={p.avatarDataUrl} />
+                  <div>
+                    <div>{p.name}</div>
+                    <div style={{ fontSize: 12, opacity: 0.7 }}>
+                      {p.stats?.games ?? 0} parties · {p.stats?.legs ?? 0} legs · {p.stats?.darts ?? 0} darts
                     </div>
-                  </button>
-                );
-              })}
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
   
-          {/* ========= Colonne droite : fiche du profil sélectionné ========= */}
+          {/* Colonne droite : fiche du profil sélectionné */}
           <div
             style={{
               border: "1px solid rgba(255,255,255,.08)",
@@ -1767,82 +1709,44 @@ function GamesHub({
             }}
           >
             {!selected ? (
-              <div style={{ opacity: 0.7 }}>Sélectionne un profil.</div>
+              <div style={{ opacity: 0.7 }}>Sélectionne un profil (ou crée-en un).</div>
             ) : (
               <>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
                   <Avatar name={selected.name} src={selected.avatarDataUrl} size={100} />
-  
-                  {/* Nom : verrouillé si profil-compte */}
-                  {isAccountProfile ? (
+                  <input
+                    value={selected.name}
+                    onChange={(e) =>
+                      setProfiles((arr: Profile[]) =>
+                        arr.map((p) => (p.id === selected.id ? { ...p, name: e.target.value } : p))
+                      )
+                    }
+                    style={{
+                      flex: 1,
+                      padding: "8px 10px",
+                      borderRadius: 10,
+                      border: "1px solid #333",
+                      background: "#0f0f10",
+                      color: "#eee",
+                    }}
+                  />
+                  <label
+                    style={{
+                      padding: "8px 10px",
+                      borderRadius: 10,
+                      border: "1px solid rgba(255,255,255,.08)",
+                      background: "#111",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Changer avatar
                     <input
-                      value={selected.name}
-                      readOnly
-                      title="Le nom du profil-compte est synchronisé avec la page Compte."
-                      style={{
-                        flex: 1,
-                        padding: "8px 10px",
-                        borderRadius: 10,
-                        border: "1px solid #333",
-                        background: "#141414",
-                        color: "#aaa",
-                      }}
+                      type="file"
+                      accept="image/*"
+                      className="hide-lg"
+                      onChange={(e) => uploadAvatar(e.target.files?.[0])}
                     />
-                  ) : (
-                    <input
-                      value={selected.name}
-                      onChange={(e) =>
-                        setProfiles((arr: Profile[]) =>
-                          arr.map((p) => (p.id === selected.id ? { ...p, name: e.target.value } : p))
-                        )
-                      }
-                      style={{
-                        flex: 1,
-                        padding: "8px 10px",
-                        borderRadius: 10,
-                        border: "1px solid #333",
-                        background: "#0f0f10",
-                        color: "#eee",
-                      }}
-                    />
-                  )}
-  
-                  {/* Avatar : redirige vers Compte si profil-compte */}
-                  {isAccountProfile ? (
-                    <button
-                      onClick={onOpenAccount}
-                      title="Gérer l’avatar sur la page Compte"
-                      style={{
-                        padding: "8px 10px",
-                        borderRadius: 10,
-                        border: "1px solid rgba(255,255,255,.08)",
-                        background: "linear-gradient(180deg, rgba(245,158,11,.18), rgba(10,10,12,.55))",
-                        color: "#eee",
-                        cursor: "pointer",
-                        fontWeight: 800,
-                      }}
-                    >
-                      Gérer dans “Compte”
-                    </button>
-                  ) : (
-                    <label
-                      style={{
-                        padding: "8px 10px",
-                        borderRadius: 10,
-                        border: "1px solid rgba(255,255,255,.08)",
-                        background: "#111",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Changer avatar
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hide-lg"
-                        onChange={(e) => uploadAvatar(e.target.files?.[0])}
-                      />
-                    </label>
-                  )}
+                  </label>
                 </div>
   
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>Aperçu des stats (volées)</div>
@@ -1856,284 +1760,308 @@ function GamesHub({
         </div>
       </section>
     );
-  }  
+  }    
 
-/* =========================================
-   LobbyPage (avec ordre, mélange, badges)
+  /* =========================================
+   LobbyPage — auto-sélection du compte + badge
    ========================================= */
-   function LobbyPage({
-    mode,
-    teams,
-    profiles,
-    rules,
-    setRules,
-    onStart,
-    onBack,
-  }: {
-    mode: Mode;
-    teams: Team[];
-    profiles: Profile[];
-    rules: MatchRules;
-    setRules: (r: MatchRules) => void;
-    onStart: (players: Player[], customRules?: MatchRules) => void;
-    onBack: () => void;
-  }) {
-    // état local
-    const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
-    const [localRules, setLocalRules] = React.useState<MatchRules>(rules);
-  
-    // shuffle Fisher–Yates
-    function shuffle<T>(arr: T[]): T[] {
-      const a = [...arr];
-      for (let i = a.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [a[i], a[j]] = [a[j], a[i]];
-      }
-      return a;
+function LobbyPage({
+  mode,
+  teams,
+  profiles,
+  rules,
+  setRules,
+  onStart,
+  onBack,
+}: {
+  mode: Mode;
+  teams: Team[];
+  profiles: Profile[];
+  rules: MatchRules;
+  setRules: (r: MatchRules) => void;
+  onStart: (players: Player[], customRules?: MatchRules) => void;
+  onBack: () => void;
+}) {
+  // état local
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
+  const [localRules, setLocalRules] = React.useState<MatchRules>(rules);
+
+  // ➜ Auto-pré-sélection du profil du compte s’il existe
+  React.useEffect(() => {
+    const acc = profiles.find(p => p.id.startsWith("acc:"))?.id;
+    if (!acc) return;
+    setSelectedIds((ids) => (ids.includes(acc) ? ids : [acc, ...ids]));
+  }, [profiles]);
+
+  // shuffle Fisher–Yates
+  function shuffle<T>(arr: T[]): T[] {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
     }
-  
-    function toggle(id: string) {
-      setSelectedIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+    return a;
+  }
+
+  function toggle(id: string) {
+    setSelectedIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  }
+
+  function reshuffleSelected() {
+    setSelectedIds((ids) => shuffle(ids));
+  }
+
+  function onToggleRandomOrder(checked: boolean) {
+    setLocalRules((r) => ({ ...r, randomOrder: checked }));
+    if (checked) reshuffleSelected();
+  }
+
+  function start() {
+    const chosen = selectedIds
+      .map((id) => profiles.find((p) => p.id === id))
+      .filter(Boolean)
+      .map<Player>((p) => ({
+        id: uid(),
+        name: p!.name,
+        profileId: p!.id,
+        avatarDataUrl: p!.avatarDataUrl,
+        teamId: p!.teamId,
+        x01Score: localRules.startingScore,
+        legs: 0,
+        sets: 0,
+        dartsUsed: 0,
+        lastScore: 0,
+        points: 0,
+        lives: 3,
+        atcTarget: 1,
+      }));
+
+    if (chosen.length === 0) {
+      alert("Sélectionne au moins 1 joueur.");
+      return;
     }
-  
-    function reshuffleSelected() {
-      setSelectedIds((ids) => shuffle(ids));
-    }
-  
-    function onToggleRandomOrder(checked: boolean) {
-      setLocalRules((r) => ({ ...r, randomOrder: checked }));
-      if (checked) reshuffleSelected();
-    }
-  
-    function start() {
-      // respecte l’ordre coché dans selectedIds
-      const chosen = selectedIds
-        .map((id) => profiles.find((p) => p.id === id))
-        .filter(Boolean)
-        .map<Player>((p) => ({
-          id: uid(),
-          name: p!.name,
-          profileId: p!.id,
-          avatarDataUrl: p!.avatarDataUrl,
-          teamId: p!.teamId,
-          x01Score: localRules.startingScore,
-          legs: 0,
-          sets: 0,
-          dartsUsed: 0,
-          lastScore: 0,
-          points: 0,
-          lives: 3,
-          atcTarget: 1,
-        }));
-  
-      if (chosen.length === 0) {
-        alert("Sélectionne au moins 1 joueur.");
-        return;
-      }
-  
-      const finalPlayers = localRules.randomOrder ? shuffle(chosen) : chosen;
-      onStart(finalPlayers, localRules);
-    }
-  
-    return (
-      <section style={{ display: "grid", gap: 12 }}>
-        {/* Top bar */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <GlassButton onClick={onBack} leftIcon="folder">Retour</GlassButton>
-          <div style={{ opacity: 0.8 }}>Mode : <b>{mode}</b></div>
-        </div>
-  
-        {/* Deux colonnes : Joueurs / Paramètres */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          {/* === Colonne Joueurs === */}
-          <div
-            style={{
-              border: "1px solid rgba(255,255,255,.08)",
-              background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
-              borderRadius: 12,
-              padding: 12,
-            }}
-          >
-            <div style={{ fontWeight: 700, marginBottom: 8 }}>Joueurs</div>
-            <div style={{ display: "grid", gap: 6, maxHeight: 360, overflow: "auto", paddingRight: 4 }}>
-              {profiles.map((p) => {
-                const index = selectedIds.indexOf(p.id);
-                const is = index !== -1;
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => toggle(p.id)}
+
+    const finalPlayers = localRules.randomOrder ? shuffle(chosen) : chosen;
+    onStart(finalPlayers, localRules);
+  }
+
+  return (
+    <section style={{ display: "grid", gap: 12 }}>
+      {/* Top bar */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <GlassButton onClick={onBack} leftIcon="folder">Retour</GlassButton>
+        <div style={{ opacity: 0.8 }}>Mode : <b>{mode}</b></div>
+      </div>
+
+      {/* Deux colonnes : Joueurs / Paramètres */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        {/* === Colonne Joueurs === */}
+        <div
+          style={{
+            border: "1px solid rgba(255,255,255,.08)",
+            background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
+            borderRadius: 12,
+            padding: 12,
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>Joueurs</div>
+          <div style={{ display: "grid", gap: 6, maxHeight: 360, overflow: "auto", paddingRight: 4 }}>
+            {profiles.map((p) => {
+              const index = selectedIds.indexOf(p.id);
+              const is = index !== -1;
+              const isAcc = p.id.startsWith("acc:");
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => toggle(p.id)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    textAlign: "left",
+                    padding: 8,
+                    borderRadius: 10,
+                    border: "1px solid rgba(255,255,255,.08)",
+                    background: is
+                      ? "radial-gradient(120px 60px at 50% -20%, rgba(245,158,11,.35), rgba(245,158,11,.08))"
+                      : "#0e0e10",
+                    color: is ? "var(--c-primary)" : "#e7e7e7",
+                    fontWeight: is ? 800 : 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  {/* badge d'ordre */}
+                  <div
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      textAlign: "left",
-                      padding: 8,
-                      borderRadius: 10,
-                      border: "1px solid rgba(255,255,255,.08)",
-                      background: is
-                        ? "radial-gradient(120px 60px at 50% -20%, rgba(245,158,11,.35), rgba(245,158,11,.08))"
-                        : "#0e0e10",
-                      color: is ? "var(--c-primary)" : "#e7e7e7",
-                      fontWeight: is ? 800 : 600,
-                      cursor: "pointer",
+                      width: 26,
+                      height: 26,
+                      borderRadius: 999,
+                      display: "grid",
+                      placeItems: "center",
+                      fontSize: 12,
+                      fontWeight: 900,
+                      background: is ? "var(--c-primary)" : "#222",
+                      color: is ? "#111" : "#aaa",
+                      border: "1px solid rgba(255,255,255,.12)",
                     }}
+                    title={is ? `Ordre #${index + 1}` : "Non sélectionné"}
                   >
-                    {/* badge d'ordre */}
-                    <div
-                      style={{
-                        width: 26,
-                        height: 26,
-                        borderRadius: 999,
-                        display: "grid",
-                        placeItems: "center",
-                        fontSize: 12,
-                        fontWeight: 900,
-                        background: is ? "var(--c-primary)" : "#222",
-                        color: is ? "#111" : "#aaa",
-                        border: "1px solid rgba(255,255,255,.12)",
-                      }}
-                      title={is ? `Ordre #${index + 1}` : "Non sélectionné"}
-                    >
-                      {is ? index + 1 : "—"}
+                    {is ? index + 1 : "—"}
+                  </div>
+
+                  <Avatar name={p.name} src={p.avatarDataUrl} />
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span>{p.name}</span>
+                      {isAcc && (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 900,
+                            color: "#111",
+                            background: "var(--c-primary)",
+                            border: "1px solid rgba(0,0,0,.25)",
+                            borderRadius: 999,
+                            padding: "2px 6px",
+                          }}
+                        >
+                          Compte
+                        </span>
+                      )}
                     </div>
-  
-                    <Avatar name={p.name} src={p.avatarDataUrl} />
-                    <div>
-                      <div>{p.name}</div>
-                      <div style={{ fontSize: 12, opacity: 0.7 }}>
-                        {teams.find((t) => t.id === p.teamId)?.name || "(Aucune équipe)"}
-                      </div>
+                    <div style={{ fontSize: 12, opacity: 0.7 }}>
+                      {teams.find((t) => t.id === p.teamId)?.name || "(Aucune équipe)"}
                     </div>
-                  </button>
-                );
-              })}
-            </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
-  
-          {/* === Colonne Paramètres === */}
-          <div
-            style={{
-              border: "1px solid rgba(255,255,255,.08)",
-              background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
-              borderRadius: 12,
-              padding: 12,
-            }}
-          >
-            <div style={{ fontWeight: 700, marginBottom: 8 }}>Paramètres</div>
-  
-            {mode === "X01" && (
-              <>
-                <div style={{ marginBottom: 6, opacity: 0.8 }}>Score de départ</div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-                  {[301, 501, 701, 1001].map((s) => (
-                    <GlassButton
-                      key={s}
-                      onClick={() => setLocalRules({ ...localRules, startingScore: s })}
-                      active={localRules.startingScore === s}
-                    >
-                      {s}
-                    </GlassButton>
-                  ))}
-                </div>
-                <label style={{ display: "flex", alignItems: "center", gap: 8, opacity: 0.9 }}>
-                  <input
-                    type="checkbox"
-                    checked={localRules.doubleOut}
-                    onChange={(e) => setLocalRules({ ...localRules, doubleOut: e.target.checked })}
-                  />
-                  Sortie en double
-                </label>
-              </>
-            )}
-  
-            {/* Legs / Sets */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 }}>
-              <div>
-                <div style={{ marginBottom: 4, opacity: 0.8 }}>Legs / set</div>
-                <input
-                  type="number"
-                  min={1}
-                  value={localRules.legsToWinSet}
-                  onChange={(e) =>
-                    setLocalRules({
-                      ...localRules,
-                      legsToWinSet: Math.max(1, Number(e.target.value) || 1),
-                    })
-                  }
-                  style={{
-                    width: "100%",
-                    padding: "8px 10px",
-                    borderRadius: 10,
-                    border: "1px solid #333",
-                    background: "#0f0f10",
-                    color: "#eee",
-                  }}
-                />
+        </div>
+
+        {/* === Colonne Paramètres === */}
+        <div
+          style={{
+            border: "1px solid rgba(255,255,255,.08)",
+            background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
+            borderRadius: 12,
+            padding: 12,
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>Paramètres</div>
+
+          {mode === "X01" && (
+            <>
+              <div style={{ marginBottom: 6, opacity: 0.8 }}>Score de départ</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                {[301, 501, 701, 1001].map((s) => (
+                  <GlassButton
+                    key={s}
+                    onClick={() => setLocalRules({ ...localRules, startingScore: s })}
+                    active={localRules.startingScore === s}
+                  >
+                    {s}
+                  </GlassButton>
+                ))}
               </div>
-              <div>
-                <div style={{ marginBottom: 4, opacity: 0.8 }}>Sets / match</div>
-                <input
-                  type="number"
-                  min={1}
-                  value={localRules.setsToWinMatch}
-                  onChange={(e) =>
-                    setLocalRules({
-                      ...localRules,
-                      setsToWinMatch: Math.max(1, Number(e.target.value) || 1),
-                    })
-                  }
-                  style={{
-                    width: "100%",
-                    padding: "8px 10px",
-                    borderRadius: 10,
-                    border: "1px solid #333",
-                    background: "#0f0f10",
-                    color: "#eee",
-                  }}
-                />
-              </div>
-            </div>
-  
-            {/* ===== Ordre de jeu ===== */}
-            <div
-              style={{
-                marginTop: 12,
-                padding: 10,
-                borderRadius: 12,
-                border: "1px solid rgba(255,255,255,.08)",
-                background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
-              }}
-            >
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>Ordre de jeu</div>
-              <label style={{ display: "inline-flex", alignItems: "center", gap: 8, opacity: 0.9 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, opacity: 0.9 }}>
                 <input
                   type="checkbox"
-                  checked={!!localRules.randomOrder}
-                  onChange={(e) => onToggleRandomOrder(e.target.checked)}
+                  checked={localRules.doubleOut}
+                  onChange={(e) => setLocalRules({ ...localRules, doubleOut: e.target.checked })}
                 />
-                Tirage aléatoire au lancement
+                Sortie en double
               </label>
-  
-              <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-                <GlassButton onClick={reshuffleSelected}>Mélanger maintenant</GlassButton>
-              </div>
-  
-              <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
-                Astuce : l’ordre affiché (#1, #2, …) est celui utilisé au démarrage.
-              </div>
+            </>
+          )}
+
+          {/* Legs / Sets */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 }}>
+            <div>
+              <div style={{ marginBottom: 4, opacity: 0.8 }}>Legs / set</div>
+              <input
+                type="number"
+                min={1}
+                value={localRules.legsToWinSet}
+                onChange={(e) =>
+                  setLocalRules({
+                    ...localRules,
+                    legsToWinSet: Math.max(1, Number(e.target.value) || 1),
+                  })
+                }
+                style={{
+                  width: "100%",
+                  padding: "8px 10px",
+                  borderRadius: 10,
+                  border: "1px solid #333",
+                  background: "#0f0f10",
+                  color: "#eee",
+                }}
+              />
             </div>
-  
-            {/* Actions */}
-            <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-              <GlassButton onClick={start} leftIcon="dart">Lancer la partie</GlassButton>
-              <GlassButton onClick={onBack} leftIcon="folder">Annuler</GlassButton>
+            <div>
+              <div style={{ marginBottom: 4, opacity: 0.8 }}>Sets / match</div>
+              <input
+                type="number"
+                min={1}
+                value={localRules.setsToWinMatch}
+                onChange={(e) =>
+                  setLocalRules({
+                    ...localRules,
+                    setsToWinMatch: Math.max(1, Number(e.target.value) || 1),
+                  })
+                }
+                style={{
+                  width: "100%",
+                  padding: "8px 10px",
+                  borderRadius: 10,
+                  border: "1px solid #333",
+                  background: "#0f0f10",
+                  color: "#eee",
+                }}
+              />
             </div>
           </div>
+
+          {/* ===== Ordre de jeu ===== */}
+          <div
+            style={{
+              marginTop: 12,
+              padding: 10,
+              borderRadius: 12,
+              border: "1px solid rgba(255,255,255,.08)",
+              background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
+            }}
+          >
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>Ordre de jeu</div>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 8, opacity: 0.9 }}>
+              <input
+                type="checkbox"
+                checked={!!localRules.randomOrder}
+                onChange={(e) => onToggleRandomOrder(e.target.checked)}
+              />
+              Tirage aléatoire au lancement
+            </label>
+
+            <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+              <GlassButton onClick={reshuffleSelected}>Mélanger maintenant</GlassButton>
+            </div>
+
+            <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
+              Astuce : l’ordre affiché (#1, #2, …) est celui utilisé au démarrage.
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+            <GlassButton onClick={start} leftIcon="dart">Lancer la partie</GlassButton>
+            <GlassButton onClick={onBack} leftIcon="folder">Annuler</GlassButton>
+          </div>
         </div>
-      </section>
-    );
-  }  
+      </div>
+    </section>
+  );
+} 
 
 // ===== Mini-checkouts X01 (exemple) =====
 const MINI_CHECKOUTS: Record<number, string> = {
