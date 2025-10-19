@@ -361,6 +361,319 @@ function GameStatsPage({
 }
 
 /* =========================================
+   StatsPage (stub simple)
+   ========================================= */
+   function StatsPage({ profiles }: { profiles: Profile[] }) {
+    return (
+      <section style={{ display: "grid", gap: 12 }}>
+        <div style={{ fontWeight: 800, fontSize: 18 }}>Stats (aperçu)</div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+            gap: 10,
+          }}
+        >
+          {profiles.map((p) => (
+            <div
+              key={p.id}
+              style={{
+                border: "1px solid rgba(255,255,255,.08)",
+                background:
+                  "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
+                borderRadius: 12,
+                padding: 12,
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              <Avatar name={p.name} src={p.avatarDataUrl} size={64} />
+              <div>
+                <div style={{ fontWeight: 800 }}>{p.name}</div>
+                <div style={{ fontSize: 12, opacity: 0.75 }}>
+                  {p.stats?.games ?? 0} parties · {p.stats?.legs ?? 0} legs ·{" "}
+                  {p.stats?.darts ?? 0} darts
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  /* =========================================
+   TeamsPage — création / renommage / couleur
+   ========================================= */
+function TeamsPage({
+  teams,
+  setTeams,
+}: {
+  teams: Team[];
+  setTeams: (u: any) => void;
+}) {
+  const [name, setName] = React.useState("");
+  const [color, setColor] = React.useState("#f59e0b");
+
+  function addTeam() {
+    const n = name.trim() || `Équipe ${teams.length + 1}`;
+    setTeams((arr: Team[]) => [...arr, { id: uid(), name: n, color }]);
+    setName("");
+  }
+  function rename(id: string, n: string) {
+    setTeams((arr: Team[]) => arr.map((t) => (t.id === id ? { ...t, name: n } : t)));
+  }
+  function remove(id: string) {
+    setTeams((arr: Team[]) => arr.filter((t) => t.id !== id));
+  }
+
+  return (
+    <section style={{ display: "grid", gap: 12 }}>
+      <div style={{ fontWeight: 800, fontSize: 18 }}>Équipes</div>
+
+      <div style={{ display: "flex", gap: 8 }}>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Nom de l'équipe"
+          style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid #333", background: "#0f0f10", color: "#eee" }}
+        />
+        <input
+          type="color"
+          value={color}
+          onChange={(e) => setColor(e.target.value)}
+          title="Couleur"
+          style={{ width: 48, border: "none", background: "transparent" }}
+        />
+        <GlassButton onClick={addTeam}>Ajouter</GlassButton>
+      </div>
+
+      <div style={{ display: "grid", gap: 8 }}>
+        {teams.map((t) => (
+          <div
+            key={t.id}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "auto 1fr auto",
+              gap: 10,
+              alignItems: "center",
+              border: "1px solid rgba(255,255,255,.08)",
+              background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
+              borderRadius: 12,
+              padding: 10,
+            }}
+          >
+            <div style={{ width: 24, height: 24, borderRadius: 999, background: t.color, border: "1px solid #222" }} />
+            <input
+              value={t.name}
+              onChange={(e) => rename(t.id, e.target.value)}
+              style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #333", background: "#0f0f10", color: "#eee" }}
+            />
+            <button
+              onClick={() => remove(t.id)}
+              style={{ borderRadius: 10, border: "1px solid rgba(255,255,255,.08)", background: "#111", color: "#eee", padding: "8px 10px", cursor: "pointer" }}
+            >
+              Supprimer
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* =========================================
+   AllGamesPage — Historique des parties
+   ========================================= */
+function AllGamesPage({
+  games,
+  events,
+  profiles,
+  onOpen,
+}: {
+  games: GameRecord[];
+  events: GameEvent[];
+  profiles: Profile[];
+  onOpen: (id: string) => void;
+}) {
+  function nameOf(pid: string) {
+    return profiles.find((p) => p.id === pid)?.name || "—";
+  }
+  return (
+    <section style={{ display: "grid", gap: 12 }}>
+      <div style={{ fontWeight: 800, fontSize: 18 }}>Historique des parties</div>
+      {!games.length ? (
+        <div style={{ opacity: 0.7 }}>Aucune partie enregistrée pour le moment.</div>
+      ) : (
+        <div style={{ display: "grid", gap: 8 }}>
+          {games
+            .slice()
+            .reverse()
+            .map((g) => {
+              const evCount = events.filter((e) => e.meta?.gameId === g.id).length;
+              const players = g.players.map((p) => nameOf(p.profileId)).join(" · ");
+              return (
+                <button
+                  key={g.id}
+                  onClick={() => onOpen(g.id)}
+                  style={{
+                    textAlign: "left",
+                    border: "1px solid rgba(255,255,255,.08)",
+                    background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
+                    borderRadius: 12,
+                    padding: 12,
+                    color: "#eee",
+                    cursor: "pointer",
+                  }}
+                >
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <b style={{ color: "var(--c-primary)" }}>{g.mode}</b>
+                    <span style={{ opacity: 0.75 }}>• {new Date(g.startedAt).toLocaleString()}</span>
+                  </div>
+                  <div style={{ opacity: 0.85, marginTop: 4 }}>{players}</div>
+                  <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2 }}>
+                    Volées enregistrées : {evCount}
+                  </div>
+                </button>
+              );
+            })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* =========================================
+   FriendsPage — liste + ajout simple
+   ========================================= */
+function FriendsPage({
+  friends,
+  setFriends,
+  onBack,
+}: {
+  friends: Friend[];
+  setFriends: (u: any) => void;
+  onBack: () => void;
+}) {
+  const [name, setName] = React.useState("");
+
+  function addFriend() {
+    const n = name.trim();
+    if (!n) return;
+    setFriends((arr: Friend[]) => [...arr, { id: uid(), name: n }]);
+    setName("");
+  }
+  function remove(id: string) {
+    setFriends((arr: Friend[]) => arr.filter((f) => f.id !== id));
+  }
+
+  return (
+    <section style={{ display: "grid", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <GlassButton onClick={onBack} leftIcon="folder">Retour</GlassButton>
+        <div style={{ fontWeight: 800, fontSize: 18 }}>Mes amis</div>
+      </div>
+
+      <div style={{ display: "flex", gap: 8 }}>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Pseudo de l'ami"
+          style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid #333", background: "#0f0f10", color: "#eee" }}
+        />
+        <GlassButton onClick={addFriend}>Ajouter</GlassButton>
+      </div>
+
+      <div style={{ display: "grid", gap: 8 }}>
+        {friends.map((f) => (
+          <div
+            key={f.id}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              border: "1px solid rgba(255,255,255,.08)",
+              background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
+              borderRadius: 12,
+              padding: 10,
+            }}
+          >
+            <Avatar name={f.name} />
+            <div style={{ fontWeight: 700 }}>{f.name}</div>
+            <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+              <button
+                style={{ borderRadius: 10, border: "1px solid rgba(255,255,255,.08)", background: "#111", color: "#eee", padding: "6px 10px", cursor: "pointer" }}
+                onClick={() => remove(f.id)}
+              >
+                Retirer
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* =========================================
+   OnlineLobbyPage — mini lobby (création salle)
+   ========================================= */
+function OnlineLobbyPage({
+  account,
+  loggedIn,
+  lobbies,
+  setLobbies,
+  onBack,
+}: {
+  account: Account | null;
+  loggedIn: boolean;
+  lobbies: Lobby[];
+  setLobbies: (u: any) => void;
+  onBack: () => void;
+}) {
+  function createLobby() {
+    setLobbies((arr: Lobby[]) => [...arr, { id: uid(), name: `Salle ${arr.length + 1}` }]);
+  }
+  return (
+    <section style={{ display: "grid", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <GlassButton onClick={onBack} leftIcon="folder">Retour</GlassButton>
+        <div style={{ fontWeight: 800, fontSize: 18 }}>Jeu Online</div>
+      </div>
+
+      {!loggedIn || !account ? (
+        <div style={{ opacity: 0.8 }}>Connecte-toi pour créer/rejoindre une salle.</div>
+      ) : (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Avatar name={account.name} src={account.avatarDataUrl} />
+            <div>Connecté en tant que <b>{account.name}</b></div>
+          </div>
+          <GlassButton onClick={createLobby} leftIcon="dart">Créer une salle</GlassButton>
+
+          <div style={{ display: "grid", gap: 8 }}>
+            {lobbies.map((l) => (
+              <div
+                key={l.id}
+                style={{
+                  border: "1px solid rgba(255,255,255,.08)",
+                  background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
+                  borderRadius: 12,
+                  padding: 10,
+                }}
+              >
+                {l.name || "Salle sans nom"}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+/* =========================================
    App
    ========================================= */
 export default function App() {
@@ -522,6 +835,7 @@ export default function App() {
             events={events}
             account={account}
             loggedIn={loggedIn}
+            onOpenAccount={() => setRoute("account")}   // clic sur “Votre compte” ou gestion avatar
           />
         )}
 
@@ -1205,29 +1519,58 @@ function GamesHub({
 }
 
 /* =========================================
-   ProfilesPage (avec bloc "Votre compte")
+   ProfilesPage — inclut le compte comme profil jouable
    ========================================= */
    function ProfilesPage({
     profiles, setProfiles, teams, setTeams, events,
     account, loggedIn,
+    onOpenAccount,                 // ✅ pour router vers la page Compte
   }: {
     profiles: Profile[];
-    setProfiles: (u: any) => void;
+    setProfiles: (updater: any) => void;
     teams: Team[];
-    setTeams: (u: any) => void;
+    setTeams: (updater: any) => void;
     events: GameEvent[];
     account?: Account | null;
     loggedIn: boolean;
+    onOpenAccount?: () => void;
   }) {
+    // === Sync: injecte/MAJ automatiquement le profil du compte (jouable) ===
+    useEffect(() => {
+      if (!loggedIn || !account) return;
+      const pid = `acc:${account.id}`; // id spécial et stable
+      setProfiles((arr: Profile[]) => {
+        const exists = arr.some(p => p.id === pid);
+        const nextProfile: Profile = {
+          id: pid,
+          name: account.name,
+          avatarDataUrl: (account as any).avatarDataUrl,
+          stats: arr.find(p => p.id === pid)?.stats ?? { games: 0, legs: 0, sets: 0, darts: 0 },
+        };
+        return exists
+          ? arr.map(p => (p.id === pid ? nextProfile : p))
+          : [...arr, nextProfile];
+      });
+    // on suit finement les champs qui peuvent changer
+    }, [loggedIn, account?.id, account?.name, (account as any)?.avatarDataUrl, setProfiles]);
   
     const [selectedId, setSelectedId] = useState<string>(() => profiles[0]?.id || "");
-    const selected = useMemo(() => profiles.find((p) => p.id === selectedId), [profiles, selectedId]);
+    const selected = useMemo(
+      () => profiles.find((p) => p.id === selectedId),
+      [profiles, selectedId]
+    );
   
     const [newName, setNewName] = useState("");
   
     async function uploadAvatar(f?: File) {
       if (!selected || !f) return;
       const url = await fileToDataURL(f);
+  
+      // Si c'est le profil-compte, on renvoie vers la page compte (source de vérité)
+      if (selected.id.startsWith("acc:")) {
+        onOpenAccount?.();
+        return;
+      }
       setProfiles((arr: Profile[]) =>
         arr.map((p) => (p.id === selected.id ? { ...p, avatarDataUrl: url } : p))
       );
@@ -1240,6 +1583,8 @@ function GamesHub({
       setNewName("");
       setSelectedId(p.id);
     }
+  
+    const isAccountProfile = !!selected && selected.id.startsWith("acc:");
   
     return (
       <section style={{ display: "grid", gap: 12 }}>
@@ -1255,7 +1600,7 @@ function GamesHub({
         </div>
   
         <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 12 }}>
-          {/* ========= Colonne gauche : création + liste ========= */}
+          {/* ========= Colonne gauche : Compte + création + liste ========= */}
           <div
             style={{
               border: "1px solid rgba(255,255,255,.08)",
@@ -1264,10 +1609,14 @@ function GamesHub({
               padding: 10,
             }}
           >
-            {/* ✅ Bloc “Votre compte” si connecté */}
+            {/* ✅ Bloc “Votre compte” cliquable si connecté */}
             {loggedIn && account && (
-              <div
+              <button
+                onClick={onOpenAccount}
+                title="Ouvrir la page Compte"
                 style={{
+                  width: "100%",
+                  textAlign: "left",
                   border: "1px solid rgba(255,255,255,.12)",
                   background:
                     "linear-gradient(180deg, rgba(245,158,11,.12), rgba(10,10,12,.55))",
@@ -1277,21 +1626,23 @@ function GamesHub({
                   display: "flex",
                   alignItems: "center",
                   gap: 10,
+                  cursor: "pointer",
                 }}
               >
                 <Avatar
                   name={account.name}
-                  // si tu as bien ajouté `avatarDataUrl?: string` dans Account
                   src={(account as any).avatarDataUrl}
-                  size={48}
+                  size={70}
                 />
                 <div style={{ display: "grid" }}>
                   <div style={{ fontWeight: 900, color: "var(--c-primary)" }}>
                     Votre compte
                   </div>
                   <div style={{ opacity: 0.85 }}>{account.name}</div>
+                  <div style={{ fontSize: 12, opacity: 0.7 }}>
+                  </div>
                 </div>
-              </div>
+              </button>
             )}
   
             {/* Création rapide d’un profil local */}
@@ -1344,45 +1695,65 @@ function GamesHub({
                     aria-hidden="true"
                     style={{ opacity: 0.9 }}
                   >
-                    <path d="M12 12c2.761 0 5-2.686 5-6s-2.239-6-5-6-5 2.686-5 6 2.239 6 5 6zm0 2c-4.418 0-8 2.239-8 5v3h16v-3c0-2.761-3.582-5-8-5z" />
+                    <path d="M12 12c2.761 0 5-2.686 5-6s-2.239-6-5-6-5 2.686-5 6 2.239 6 5 6zm0 2c-4.418 0-8 2.239-8 5v3h16v-3c0-2.761-3.582-5-8-5z"/>
                   </svg>
                   <span>+</span>
                 </span>
               </button>
             </div>
   
-            {/* Liste des profils locaux */}
+            {/* Liste des profils (le profil-compte apparaît avec un badge) */}
             <div style={{ display: "grid", gap: 6, maxHeight: 380, overflow: "auto", paddingRight: 4 }}>
-              {profiles.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setSelectedId(p.id)}
-                  style={{
-                    textAlign: "left",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: 8,
-                    borderRadius: 10,
-                    border: "1px solid rgba(255,255,255,.08)",
-                    background:
-                      selectedId === p.id
-                        ? "radial-gradient(120px 60px at 50% -20%, rgba(245,158,11,.35), rgba(245,158,11,.08))"
-                        : "#0e0e10",
-                    color: selectedId === p.id ? "var(--c-primary)" : "#e7e7e7",
-                    fontWeight: selectedId === p.id ? 800 : 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  <Avatar name={p.name} src={p.avatarDataUrl} />
-                  <div>
-                    <div>{p.name}</div>
-                    <div style={{ fontSize: 12, opacity: 0.7 }}>
-                      {p.stats?.games ?? 0} parties · {p.stats?.legs ?? 0} legs · {p.stats?.darts ?? 0} darts
+              {profiles.map((p) => {
+                const isAcc = p.id.startsWith("acc:");
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => setSelectedId(p.id)}
+                    style={{
+                      textAlign: "left",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: 8,
+                      borderRadius: 10,
+                      border: "1px solid rgba(255,255,255,.08)",
+                      background:
+                        selectedId === p.id
+                          ? "radial-gradient(120px 60px at 50% -20%, rgba(245,158,11,.35), rgba(245,158,11,.08))"
+                          : "#0e0e10",
+                      color: selectedId === p.id ? "var(--c-primary)" : "#e7e7e7",
+                      fontWeight: selectedId === p.id ? 800 : 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Avatar name={p.name} src={p.avatarDataUrl} />
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span>{p.name}</span>
+                        {isAcc && (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 900,
+                              color: "#111",
+                              background: "var(--c-primary)",
+                              border: "1px solid rgba(0,0,0,.25)",
+                              borderRadius: 999,
+                              padding: "2px 6px",
+                            }}
+                          >
+                            Compte
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 12, opacity: 0.7 }}>
+                        {p.stats?.games ?? 0} parties · {p.stats?.legs ?? 0} legs · {p.stats?.darts ?? 0} darts
+                      </div>
                     </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           </div>
   
@@ -1401,39 +1772,77 @@ function GamesHub({
               <>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
                   <Avatar name={selected.name} src={selected.avatarDataUrl} size={100} />
-                  <input
-                    value={selected.name}
-                    onChange={(e) =>
-                      setProfiles((arr: Profile[]) =>
-                        arr.map((p) => (p.id === selected.id ? { ...p, name: e.target.value } : p))
-                      )
-                    }
-                    style={{
-                      flex: 1,
-                      padding: "8px 10px",
-                      borderRadius: 10,
-                      border: "1px solid #333",
-                      background: "#0f0f10",
-                      color: "#eee",
-                    }}
-                  />
-                  <label
-                    style={{
-                      padding: "8px 10px",
-                      borderRadius: 10,
-                      border: "1px solid rgba(255,255,255,.08)",
-                      background: "#111",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Changer avatar
+  
+                  {/* Nom : verrouillé si profil-compte */}
+                  {isAccountProfile ? (
                     <input
-                      type="file"
-                      accept="image/*"
-                      className="hide-lg"
-                      onChange={(e) => uploadAvatar(e.target.files?.[0])}
+                      value={selected.name}
+                      readOnly
+                      title="Le nom du profil-compte est synchronisé avec la page Compte."
+                      style={{
+                        flex: 1,
+                        padding: "8px 10px",
+                        borderRadius: 10,
+                        border: "1px solid #333",
+                        background: "#141414",
+                        color: "#aaa",
+                      }}
                     />
-                  </label>
+                  ) : (
+                    <input
+                      value={selected.name}
+                      onChange={(e) =>
+                        setProfiles((arr: Profile[]) =>
+                          arr.map((p) => (p.id === selected.id ? { ...p, name: e.target.value } : p))
+                        )
+                      }
+                      style={{
+                        flex: 1,
+                        padding: "8px 10px",
+                        borderRadius: 10,
+                        border: "1px solid #333",
+                        background: "#0f0f10",
+                        color: "#eee",
+                      }}
+                    />
+                  )}
+  
+                  {/* Avatar : redirige vers Compte si profil-compte */}
+                  {isAccountProfile ? (
+                    <button
+                      onClick={onOpenAccount}
+                      title="Gérer l’avatar sur la page Compte"
+                      style={{
+                        padding: "8px 10px",
+                        borderRadius: 10,
+                        border: "1px solid rgba(255,255,255,.08)",
+                        background: "linear-gradient(180deg, rgba(245,158,11,.18), rgba(10,10,12,.55))",
+                        color: "#eee",
+                        cursor: "pointer",
+                        fontWeight: 800,
+                      }}
+                    >
+                      Gérer dans “Compte”
+                    </button>
+                  ) : (
+                    <label
+                      style={{
+                        padding: "8px 10px",
+                        borderRadius: 10,
+                        border: "1px solid rgba(255,255,255,.08)",
+                        background: "#111",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Changer avatar
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hide-lg"
+                        onChange={(e) => uploadAvatar(e.target.files?.[0])}
+                      />
+                    </label>
+                  )}
                 </div>
   
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>Aperçu des stats (volées)</div>
@@ -1725,6 +2134,28 @@ function GamesHub({
       </section>
     );
   }  
+
+// ===== Mini-checkouts X01 (exemple) =====
+const MINI_CHECKOUTS: Record<number, string> = {
+  170:"T20 T20 Bull",167:"T20 T19 Bull",164:"T20 T18 Bull",161:"T20 T17 Bull",
+  160:"T20 T20 D20",158:"T20 T20 D19",157:"T20 T19 D20",156:"T20 T20 D18",
+  155:"T20 T19 D19",154:"T20 T18 D20",153:"T20 T19 D18",152:"T20 T20 D16",
+  151:"T20 T17 D20",150:"T20 T18 D18",149:"T20 T19 D16",148:"T20 T16 D20",
+  147:"T20 T17 D18",146:"T20 T18 D16",145:"T20 T15 D20",144:"T20 T20 D12",
+  141:"T20 T19 D12",140:"T20 T20 D10",136:"T20 T20 D8",132:"Bull Bull D16",
+  130:"T20 20 Bull",129:"T19 20 Bull",121:"T20 11 D20",120:"T20 20 D20",
+  117:"T20 17 D20",116:"T20 16 D20",115:"T20 15 D20",112:"T20 12 D20",
+  110:"T20 10 D20",100:"T20 D20",96:"T20 D18",95:"T19 D19",94:"T18 D20",
+  90:"T20 D15",86:"T18 D16",84:"T20 D12",81:"T15 D18",80:"T20 D10",
+  78:"T18 D12",76:"T20 D8",74:"T14 D16",72:"T16 D12",70:"T18 D8",
+  68:"T20 D4",66:"T10 D18",64:"T16 D8",62:"T10 D16",60:"20 D20",
+  58:"18 D20",56:"16 D20",54:"14 D20",52:"20 D16",50:"10 D20",
+  48:"16 D16",46:"6 D20",44:"12 D16",40:"D20",38:"D19",36:"D18",
+  32:"D16",28:"D14",24:"D12",20:"D10",16:"D8",12:"D6",8:"D4",6:"D3",4:"D2",2:"D1",
+};
+
+// Expose pour GamePage (liveCheckout)
+;(globalThis as any).CHECKOUTS = MINI_CHECKOUTS;
 
 /* =========================================
    GamePage — volée = 3 fléchettes (dartsUsed +3 par volée)
@@ -2576,385 +3007,430 @@ function Avatar({ name, src, size = 70 }: { name: string; src?: string; size?: n
         <div style={boxStyle(darts[2] || null)}>{label(darts[2] || null)}</div>
       </div>
     );
-  }  
-
-/* =========================================
-   Glass UI helpers
-   ========================================= */
-function GlassButton({
-  children,
-  onClick,
-  active,
-  leftIcon,
-}: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  active?: boolean;
-  leftIcon?: IconName;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        appearance: "none",
-        border: active ? "1px solid rgba(245,158,11,.35)" : "1px solid rgba(255,255,255,.08)",
-        background: active
-          ? "radial-gradient(120px 60px at 50% -20%, rgba(245,158,11,.28), rgba(245,158,11,.07))"
-          : "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
-        color: active ? "var(--c-primary)" : "#e7e7e7",
-        padding: "10px 14px",
-        borderRadius: 14,
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 8,
-        cursor: "pointer",
-        backdropFilter: "blur(6px)",
-        WebkitBackdropFilter: "blur(6px)",
-        transition: "all 160ms ease",
-        fontWeight: active ? 800 : 700,
-      }}
-    >
-      {leftIcon && <Icon name={leftIcon} active={active} />}
-      {children}
-    </button>
-  );
-}
-
-/* =========================================
-   Top & Bottom nav (verre dépoli + SVG)
-   ========================================= */
-type IconName = "home" | "dart" | "user" | "folder" | "chart" | "settings";
-
-function TopGlassNav({ route, setRoute }: { route: Route; setRoute: (r: Route) => void }) {
-  return (
-    <nav
-      className="hide-sm"
-      style={{
-        position: "sticky",
-        top: 0,
-        zIndex: 60,
-        display: "flex",
-        gap: 8,
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "10px 12px",
-        borderBottom: "1px solid rgba(255,255,255,.07)",
-        background: "linear-gradient(180deg, rgba(18,18,22,.55), rgba(10,10,12,.72))",
-        backdropFilter: "blur(10px)",
-        WebkitBackdropFilter: "blur(10px)",
-      }}
-    >
-      <NavButtons route={route} setRoute={setRoute} layout="row" />
-    </nav>
-  );
-}
-
-function BottomNav({ route, setRoute }: { route: Route; setRoute: (r: Route) => void }) {
-  return (
-    <nav
-      className="show-sm"
-      style={{
-        position: "fixed",
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 50,
-        display: "grid",
-        gridTemplateColumns: "repeat(6,1fr)",
-        alignItems: "center",
-        gap: 6,
-        padding: "10px 12px",
-        borderTop: "1px solid rgba(255,255,255,.07)",
-        background: "linear-gradient(180deg, rgba(18,18,22,.55), rgba(10,10,12,.72))",
-        backdropFilter: "blur(10px)",
-        WebkitBackdropFilter: "blur(10px)",
-      }}
-    >
-      <NavButtons route={route} setRoute={setRoute} layout="grid" />
-    </nav>
-  );
-}
-
-function NavButtons({ route, setRoute, layout }: { route: Route; setRoute: (r: Route) => void; layout: "row" | "grid" }) {
-  const items: { key: Route; label: string; icon: IconName }[] = [
-    { key: "home", label: "Accueil", icon: "home" },
-    { key: "games", label: "Jeux", icon: "dart" },
-    { key: "profiles", label: "Profils", icon: "user" },
-    { key: "allgames", label: "Tous les jeux", icon: "folder" },
-    { key: "stats", label: "Stats", icon: "chart" },
-    { key: "settings", label: "Réglages", icon: "settings" },
-  ];
-  const btnBase: React.CSSProperties = {
-    appearance: "none",
-    border: "1px solid transparent",
-    background: "transparent",
-    color: "#e7e7e7",
-    padding: layout === "row" ? "8px 10px" : "8px 4px",
-    borderRadius: 12,
-    display: "flex",
-    flexDirection: layout === "row" ? "row" : "column",
-    alignItems: "center",
-    gap: 6,
-    cursor: "pointer",
-    transition: "transform 120ms ease, background 160ms ease, color 160ms ease, border 160ms ease",
-    fontSize: 12,
-    lineHeight: 1.1,
-  };
-  const activeBg = "radial-gradient(120px 60px at 50% -20%, rgba(245,158,11,.35), rgba(245,158,11,.08))";
-
-  return (
-    <>
-      {items.map((it) => {
-        const active = route === it.key;
-        return (
-          <button
-            key={it.key}
-            onClick={() => setRoute(it.key)}
-            aria-current={active ? "page" : undefined}
-            title={it.label}
-            style={{
-              ...btnBase,
-              background: active ? activeBg : "transparent",
-              color: active ? "var(--c-primary)" : "#e7e7e7",
-              border: active ? "1px solid rgba(245,158,11,.35)" : "1px solid transparent",
-              fontWeight: active ? 800 : 600,
-            }}
-          >
-            <Icon name={it.icon} active={active} />
-            <span style={{ whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden", maxWidth: 120 }}>
-              {it.label}
-            </span>
-          </button>
-        );
-      })}
-    </>
-  );
-}
-
-function Icon({ name, active }: { name: IconName; active?: boolean }) {
-  const stroke = active ? "var(--c-primary)" : "#e7e7e7";
-  const dim = 22;
-  const common = {
-    width: dim,
-    height: dim,
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke,
-    strokeWidth: 1.75,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-  };
-  switch (name) {
-    case "home":
-      return (
-        <svg {...common}>
-          <path d="M3 10.5 12 3l9 7.5" />
-          <path d="M5 10.5V21h14V10.5" />
-          <path d="M9 21v-6h6v6" />
-        </svg>
-      );
-    case "dart":
-      return (
-        <svg {...common}>
-          <path d="M3 3l4 1 4 4-2 2-4-4-1-4z" />
-          <path d="M11 8l9 9" />
-          <path d="M14 14l-3 6 6-3" />
-        </svg>
-      );
-    case "user":
-      return (
-        <svg {...common}>
-          <path d="M12 12a4.5 4.5 0 1 0-0.001-9.001A4.5 4.5 0 0 0 12 12z" />
-          <path d="M4 21c0-4.418 3.582-7 8-7s8 2.582 8 7" />
-        </svg>
-      );
-    case "folder":
-      return (
-        <svg {...common}>
-          <path d="M3 7h6l2 2h10v9a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7z" />
-          <path d="M3 7V6a3 3 0 0 1 3-3h3l2 2" />
-        </svg>
-      );
-    case "chart":
-      return (
-        <svg {...common}>
-          <path d="M3 21h18" />
-          <rect x="5" y="10" width="3" height="8" rx="1" />
-          <rect x="10.5" y="6" width="3" height="12" rx="1" />
-          <rect x="16" y="13" width="3" height="5" rx="1" />
-        </svg>
-      );
-    case "settings":
-      return (
-        <svg {...common}>
-          <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" />
-          <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.02.02a2 2 0 1 1-2.83 2.83l-.02-.02A1.8 1.8 0 0 0 15 19.4a1.8 1.8 0 0 0-3 0 1.8 1.8 0 0 0-1.98.36l-.02.02a2 2 0 1 1-2.83-2.83l.02-.02A1.8 1.8 0 0 0 4.6 15a1.8 1.8 0 0 0 0-3 1.8 1.8 0 0 0-.36-1.98l-.02-.02a2 2 0 1 1 2.83-2.83l.02.02A1.8 1.8 0 0 0 9 4.6a1.8 1.8 0 0 0 3 0 1.8 1.8 0 0 0 1.98-.36l.02-.02a2 2 0 1 1 2.83 2.83l-.02.02A1.8 1.8 0 0 0 19.4 12c0 .35.12.69.36 1z" />
-        </svg>
-      );
   }
-}
-
-/* =========================================
-   SectionTabs (verre dépoli, réutilisable)
-   ========================================= */
-type TabItem = { key: string; label: string; icon?: IconName };
-function SectionTabs({
-  tabs,
-  value,
-  onChange,
-  rightSlot,
-}: {
-  tabs: TabItem[];
-  value: string;
-  onChange: (k: string) => void;
-  rightSlot?: React.ReactNode;
-}) {
-  const bar: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    padding: 6,
-    borderRadius: 14,
-    background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
-    border: "1px solid rgba(255,255,255,.07)",
-    backdropFilter: "blur(6px)",
-  };
-  const btn: React.CSSProperties = {
-    appearance: "none",
-    border: "1px solid transparent",
-    background: "transparent",
-    color: "#e7e7e7",
-    padding: "8px 10px",
-    borderRadius: 12,
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    cursor: "pointer",
-    fontSize: 13,
-    transition: "all 160ms ease",
-  };
-  return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-      <div style={bar}>
-        {tabs.map((t) => {
-          const active = t.key === value;
-          return (
-            <button
-              key={t.key}
-              onClick={() => onChange(t.key)}
-              style={{
-                ...btn,
-                background: active
-                  ? "radial-gradient(100px 50px at 50% -20%, rgba(245,158,11,.28), rgba(245,158,11,.07))"
-                  : "transparent",
-                color: active ? "var(--c-primary)" : "#e7e7e7",
-                border: active ? "1px solid rgba(245,158,11,.35)" : "1px solid transparent",
-                fontWeight: active ? 800 : 600,
-              }}
-            >
-              {t.icon && <Icon name={t.icon} active={active} />}
-              <span>{t.label}</span>
-            </button>
-          );
-        })}
-      </div>
-      {rightSlot}
-    </div>
-  );
-}
-/* ===================== Modal (verre dépoli) ===================== */
-function Modal({
-  open,
-  onClose,
-  title,
-  children,
-}: {
-  open: boolean;
-  onClose: () => void;
-  title: string;
-  children: React.ReactNode;
-}) {
-  if (!open) return null;
-  return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,.5)",
-        display: "grid",
-        placeItems: "center",
-        zIndex: 100,
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
+  
+  /* =========================================
+     Glass UI helpers
+     ========================================= */
+  function GlassButton({
+    children,
+    onClick,
+    active,
+    leftIcon,
+  }: {
+    children: React.ReactNode;
+    onClick?: () => void;
+    active?: boolean;
+    leftIcon?: IconName;
+  }) {
+    return (
+      <button
+        onClick={onClick}
         style={{
-          width: "min(720px, 92vw)",
-          maxHeight: "80vh",
-          overflow: "auto",
-          borderRadius: 16,
-          border: "1px solid rgba(255,255,255,.08)",
-          background:
-            "linear-gradient(180deg, rgba(20,20,24,.65), rgba(10,10,12,.85))",
-          padding: 16,
-          color: "#eee",
+          appearance: "none",
+          border: active ? "1px solid rgba(245,158,11,.35)" : "1px solid rgba(255,255,255,.08)",
+          background: active
+            ? "radial-gradient(120px 60px at 50% -20%, rgba(245,158,11,.28), rgba(245,158,11,.07))"
+            : "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
+          color: active ? "var(--c-primary)" : "#e7e7e7",
+          padding: "10px 14px",
+          borderRadius: 14,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
+          cursor: "pointer",
+          backdropFilter: "blur(6px)",
+          WebkitBackdropFilter: "blur(6px)",
+          transition: "all 160ms ease",
+          fontWeight: active ? 800 : 700,
+        }}
+      >
+        {leftIcon && <Icon name={leftIcon} active={active} />}
+        {children}
+      </button>
+    );
+  }
+  
+  /* =========================================
+     Top & Bottom nav (verre dépoli + SVG)
+     ========================================= */
+  type IconName = "home" | "dart" | "user" | "users" | "folder" | "chart" | "settings";
+  
+  function TopGlassNav({ route, setRoute }: { route: Route; setRoute: (r: Route) => void }) {
+    return (
+      <nav
+        className="hide-sm"
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 60,
+          display: "flex",
+          gap: 8,
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "10px 12px",
+          borderBottom: "1px solid rgba(255,255,255,.07)",
+          background: "linear-gradient(180deg, rgba(18,18,22,.55), rgba(10,10,12,.72))",
           backdropFilter: "blur(10px)",
           WebkitBackdropFilter: "blur(10px)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ fontWeight: 800, fontSize: 18 }}>{title}</div>
-          <button
-            onClick={onClose}
-            style={{
-              marginLeft: "auto",
-              border: "1px solid rgba(255,255,255,.08)",
-              background: "#0e0e11",
-              color: "#eee",
-              padding: "6px 10px",
-              borderRadius: 10,
-              cursor: "pointer",
-            }}
-          >
-            Fermer
-          </button>
-        </div>
-        <div style={{ marginTop: 10, lineHeight: 1.5 }}>{children}</div>
-      </div>
-    </div>
-  );
-}
-function InfoButton({ mode }: { mode: string }) {
-  const [open, setOpen] = React.useState(false);
-  const key = MODE_TO_RULE_KEY[mode] || mode;
-  const text = GAME_RULES[key];
-
-  return (
-    <>
-      <button
-        onClick={() => setOpen(true)}
-        title="Règles"
+        <NavButtons route={route} setRoute={setRoute} layout="row" />
+      </nav>
+    );
+  }
+  
+  function BottomNav({ route, setRoute }: { route: Route; setRoute: (r: Route) => void }) {
+    return (
+      <nav
+        className="show-sm"
         style={{
-          border: "1px solid rgba(255,255,255,.08)",
-          background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
-          color: "#e7e7e7",
-          padding: "8px 10px",
-          borderRadius: 12,
-          cursor: "pointer",
-          fontWeight: 700,
+          position: "fixed",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 50,
+          display: "grid",
+          gridTemplateColumns: "repeat(7,1fr)", // ← 7 colonnes (Amis ajouté)
+          alignItems: "center",
+          gap: 6,
+          padding: "10px 12px",
+          borderTop: "1px solid rgba(255,255,255,.07)",
+          background: "linear-gradient(180deg, rgba(18,18,22,.55), rgba(10,10,12,.72))",
+          backdropFilter: "blur(10px)",
+          WebkitBackdropFilter: "blur(10px)",
         }}
       >
-        i
-      </button>
-
-      <Modal open={open} onClose={() => setOpen(false)} title={`Règles — ${mode}`}>
-        {text ? (
-          <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", margin: 0 }}>{text}</pre>
-        ) : (
-          <div>Règles à venir.</div>
-        )}
-      </Modal>
-    </>
-  );
-}
+        <NavButtons route={route} setRoute={setRoute} layout="grid" />
+      </nav>
+    );
+  }
+  
+  function NavButtons({
+    route,
+    setRoute,
+    layout,
+  }: {
+    route: Route;
+    setRoute: (r: Route) => void;
+    layout: "row" | "grid";
+  }) {
+    const items: { key: Route; label: string; icon: IconName }[] = [
+      { key: "home",     label: "Accueil",   icon: "home" },
+      { key: "games",    label: "Jeux",      icon: "dart" },
+      { key: "profiles", label: "Profils",   icon: "user" },
+      { key: "friends",  label: "Amis",      icon: "users" },   // ← NOUVEAU
+      { key: "allgames", label: "Tous les jeux", icon: "folder" },
+      { key: "stats",    label: "Stats",     icon: "chart" },
+      { key: "settings", label: "Réglages",  icon: "settings" },
+    ];
+  
+    const btnBase: React.CSSProperties = {
+      appearance: "none",
+      border: "1px solid transparent",
+      background: "transparent",
+      color: "#e7e7e7",
+      padding: layout === "row" ? "8px 10px" : "8px 4px",
+      borderRadius: 12,
+      display: "flex",
+      flexDirection: layout === "row" ? "row" : "column",
+      alignItems: "center",
+      gap: 6,
+      cursor: "pointer",
+      transition:
+        "transform 120ms ease, background 160ms ease, color 160ms ease, border 160ms ease",
+      fontSize: 12,
+      lineHeight: 1.1,
+    };
+    const activeBg =
+      "radial-gradient(120px 60px at 50% -20%, rgba(245,158,11,.35), rgba(245,158,11,.08))";
+  
+    return (
+      <>
+        {items.map((it) => {
+          const active = route === it.key;
+          return (
+            <button
+              key={it.key}
+              onClick={() => setRoute(it.key)}
+              aria-current={active ? "page" : undefined}
+              title={it.label}
+              style={{
+                ...btnBase,
+                background: active ? activeBg : "transparent",
+                color: active ? "var(--c-primary)" : "#e7e7e7",
+                border: active
+                  ? "1px solid rgba(245,158,11,.35)"
+                  : "1px solid transparent",
+                fontWeight: active ? 800 : 600,
+              }}
+            >
+              <Icon name={it.icon} active={active} />
+              <span
+                style={{
+                  whiteSpace: "nowrap",
+                  textOverflow: "ellipsis",
+                  overflow: "hidden",
+                  maxWidth: 120,
+                }}
+              >
+                {it.label}
+              </span>
+            </button>
+          );
+        })}
+      </>
+    );
+  }
+  
+  function Icon({ name, active }: { name: IconName; active?: boolean }) {
+    const stroke = active ? "var(--c-primary)" : "#e7e7e7";
+    const dim = 22;
+    const common = {
+      width: dim,
+      height: dim,
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke,
+      strokeWidth: 1.75,
+      strokeLinecap: "round" as const,
+      strokeLinejoin: "round" as const,
+    };
+    switch (name) {
+      case "home":
+        return (
+          <svg {...common}>
+            <path d="M3 10.5 12 3l9 7.5" />
+            <path d="M5 10.5V21h14V10.5" />
+            <path d="M9 21v-6h6v6" />
+          </svg>
+        );
+      case "dart":
+        return (
+          <svg {...common}>
+            <path d="M3 3l4 1 4 4-2 2-4-4-1-4z" />
+            <path d="M11 8l9 9" />
+            <path d="M14 14l-3 6 6-3" />
+          </svg>
+        );
+      case "user":
+        return (
+          <svg {...common}>
+            <path d="M12 12a4.5 4.5 0 1 0-0.001-9.001A4.5 4.5 0 0 0 12 12z" />
+            <path d="M4 21c0-4.418 3.582-7 8-7s8 2.582 8 7" />
+          </svg>
+        );
+      case "users": // ← NOUVEAU pictogramme "Amis"
+        return (
+          <svg {...common}>
+            <path d="M16 13c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4z" />
+            <path d="M8 14c-2.21 0-4-1.79-4-4S5.79 6 8 6s4 1.79 4 4-1.79 4-4 4z" />
+            <path d="M2 21c0-3.314 2.686-6 6-6" />
+            <path d="M22 21c0-3.314-2.686-6-6-6" />
+          </svg>
+        );
+      case "folder":
+        return (
+          <svg {...common}>
+            <path d="M3 7h6l2 2h10v9a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7z" />
+            <path d="M3 7V6a3 3 0 0 1 3-3h3l2 2" />
+          </svg>
+        );
+      case "chart":
+        return (
+          <svg {...common}>
+            <path d="M3 21h18" />
+            <rect x="5" y="10" width="3" height="8" rx="1" />
+            <rect x="10.5" y="6" width="3" height="12" rx="1" />
+            <rect x="16" y="13" width="3" height="5" rx="1" />
+          </svg>
+        );
+      case "settings":
+        return (
+          <svg {...common}>
+            <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" />
+            <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.02.02a2 2 0 1 1-2.83 2.83l-.02-.02A1.8 1.8 0 0 0 15 19.4a1.8 1.8 0 0 0-3 0 1.8 1.8 0 0 0-1.98.36l-.02.02a2 2 0 1 1 2.83-2.83l.02-.02A1.8 1.8 0 0 0 19.4 12c0 .35.12.69.36 1z" />
+          </svg>
+        );
+    }
+  }
+  
+  /* =========================================
+     SectionTabs (verre dépoli, réutilisable)
+     ========================================= */
+  type TabItem = { key: string; label: string; icon?: IconName };
+  function SectionTabs({
+    tabs,
+    value,
+    onChange,
+    rightSlot,
+  }: {
+    tabs: TabItem[];
+    value: string;
+    onChange: (k: string) => void;
+    rightSlot?: React.ReactNode;
+  }) {
+    const bar: React.CSSProperties = {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      padding: 6,
+      borderRadius: 14,
+      background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
+      border: "1px solid rgba(255,255,255,.07)",
+      backdropFilter: "blur(6px)",
+    };
+    const btn: React.CSSProperties = {
+      appearance: "none",
+      border: "1px solid transparent",
+      background: "transparent",
+      color: "#e7e7e7",
+      padding: "8px 10px",
+      borderRadius: 12,
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      cursor: "pointer",
+      fontSize: 13,
+      transition: "all 160ms ease",
+    };
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
+        <div style={bar}>
+          {tabs.map((t) => {
+            const active = t.key === value;
+            return (
+              <button
+                key={t.key}
+                onClick={() => onChange(t.key)}
+                style={{
+                  ...btn,
+                  background: active
+                    ? "radial-gradient(100px 50px at 50% -20%, rgba(245,158,11,.28), rgba(245,158,11,.07))"
+                    : "transparent",
+                  color: active ? "var(--c-primary)" : "#e7e7e7",
+                  border: active
+                    ? "1px solid rgba(245,158,11,.35)"
+                    : "1px solid transparent",
+                  fontWeight: active ? 800 : 600,
+                }}
+              >
+                {t.icon && <Icon name={t.icon} active={active} />}
+                <span>{t.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        {rightSlot}
+      </div>
+    );
+  }
+  
+  /* ===================== Modal (verre dépoli) ===================== */
+  function Modal({
+    open,
+    onClose,
+    title,
+    children,
+  }: {
+    open: boolean;
+    onClose: () => void;
+    title: string;
+    children: React.ReactNode;
+  }) {
+    if (!open) return null;
+    return (
+      <div
+        onClick={onClose}
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,.5)",
+          display: "grid",
+          placeItems: "center",
+          zIndex: 100,
+        }}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            width: "min(720px, 92vw)",
+            maxHeight: "80vh",
+            overflow: "auto",
+            borderRadius: 16,
+            border: "1px solid rgba(255,255,255,.08)",
+            background:
+              "linear-gradient(180deg, rgba(20,20,24,.65), rgba(10,10,12,.85))",
+            padding: 16,
+            color: "#eee",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ fontWeight: 800, fontSize: 18 }}>{title}</div>
+            <button
+              onClick={onClose}
+              style={{
+                marginLeft: "auto",
+                border: "1px solid rgba(255,255,255,.08)",
+                background: "#0e0e11",
+                color: "#eee",
+                padding: "6px 10px",
+                borderRadius: 10,
+                cursor: "pointer",
+              }}
+            >
+              Fermer
+            </button>
+          </div>
+          <div style={{ marginTop: 10, lineHeight: 1.5 }}>{children}</div>
+        </div>
+      </div>
+    );
+  }
+  
+  function InfoButton({ mode }: { mode: string }) {
+    const [open, setOpen] = React.useState(false);
+    const key = MODE_TO_RULE_KEY[mode] || mode;
+    const text = GAME_RULES[key];
+  
+    return (
+      <>
+        <button
+          onClick={() => setOpen(true)}
+          title="Règles"
+          style={{
+            border: "1px solid rgba(255,255,255,.08)",
+            background:
+              "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
+            color: "#e7e7e7",
+            padding: "8px 10px",
+            borderRadius: 12,
+            cursor: "pointer",
+            fontWeight: 700,
+          }}
+        >
+          i
+        </button>
+  
+        <Modal open={open} onClose={() => setOpen(false)} title={`Règles — ${mode}`}>
+          {text ? (
+            <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", margin: 0 }}>
+              {text}
+            </pre>
+          ) : (
+            <div>Règles à venir.</div>
+          )}
+        </Modal>
+      </>
+    );
+  }
+  
