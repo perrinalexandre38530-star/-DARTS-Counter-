@@ -1,6 +1,7 @@
 /*
-  Content-Security-Policy: default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src *; media-src 'self' blob: data:; font-src 'self' data:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; manifest-src 'self'
-  X-Content-Type-Options: nosniff
-  Referrer-Policy: no-referrer
-  Permissions-Policy: microphone=(), camera=(), geolocation=()
-  Cache-Control: public, max-age=0, must-revalidate
+  Content-Security-Policy: default-src 'self';
+  Content-Security-Policy: img-src 'self' data: blob:;
+  Content-Security-Policy: style-src 'self' 'unsafe-inline';
+  Content-Security-Policy: script-src 'self' 'unsafe-inline';
+  Content-Security-Policy: connect-src *;
+  Content-Security-Policy: media-src 'self' blob: data:;
