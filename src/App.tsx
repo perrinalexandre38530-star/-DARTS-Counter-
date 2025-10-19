@@ -147,6 +147,7 @@ type Account = {
   name: string;
   password: string;
   createdAt: number;
+  avatarDataUrl?: string;
 };
 type Friend = { id: string; name: string };
 type Lobby = { id: string; name: string };
@@ -500,6 +501,8 @@ export default function App() {
       <main style={{ maxWidth: 1000, margin: "0 auto", padding: 16 }}>
         {route === "home" && (
           <Home
+            account={account}
+            loggedIn={loggedIn}
             onGoGames={() => setRoute("games")}
             onGoProfiles={() => setRoute("profiles")}
             onGoStats={() => setRoute("stats")}
@@ -517,6 +520,8 @@ export default function App() {
             teams={teams}
             setTeams={setTeams}
             events={events}
+            account={account}
+            loggedIn={loggedIn}
           />
         )}
 
@@ -622,97 +627,247 @@ export default function App() {
 }
 
 /* =========================================
-   Account / Friends / Online pages (basiques)
+   AccountPage — création/connexion + avatar
    ========================================= */
-function AccountPage({ account, loggedIn, onCreate, onLogin, onLogout, onGoFriends }) {
-  const [name, setName] = useState("");
-  const [password, setPassword] = useState("");
-
-  if (loggedIn && account) {
+   function AccountPage({
+    account,
+    loggedIn,
+    onCreate,
+    onLogin,
+    onLogout,
+    onGoFriends,
+  }: {
+    account: any;
+    loggedIn: boolean;
+    onCreate: (acc: any) => void;
+    onLogin: (ok: boolean) => void;
+    onLogout: () => void;
+    onGoFriends: () => void;
+  }) {
+    // Champs de saisie
+    const [name, setName] = useState("");
+    const [password, setPassword] = useState("");
+  
+    // Avatar choisi côté "création de compte" (avant d'être connecté)
+    const [localAvatar, setLocalAvatar] = useState<string | undefined>(undefined);
+  
+    // Utilitaire: lire un fichier image -> dataURL (dépend de fileToDataURL défini plus haut dans ton fichier)
+    async function onPickAvatarCreate(f?: File) {
+      if (!f) return;
+      const url = await fileToDataURL(f);
+      setLocalAvatar(url);
+    }
+  
+    // Quand on est déjà connecté : changer l’avatar du compte existant
+    async function onPickAvatarUpdate(f?: File) {
+      if (!f || !loggedIn || !account) return;
+      const url = await fileToDataURL(f);
+      // On réutilise onCreate pour MAJ le compte (dans ton App, onCreate met à jour setAccount)
+      onCreate?.({ ...account, avatarDataUrl: url });
+    }
+  
+    // ==========================
+    // État "déjà connecté"
+    // ==========================
+    if (loggedIn && account) {
+      return (
+        <section style={{ maxWidth: 520, margin: "40px auto", textAlign: "center" }}>
+          <h2 style={{ marginBottom: 12 }}>
+            Connecté en tant que <b>{account.name}</b>
+          </h2>
+  
+          {/* Avatar actuel */}
+          <div style={{ display: "grid", placeItems: "center", gap: 10, marginBottom: 16 }}>
+            <img
+              src={account.avatarDataUrl || ""}
+              onError={(e) => ((e.currentTarget.style.display = "none"))}
+              alt="Avatar"
+              style={{
+                width: 96,
+                height: 96,
+                borderRadius: "50%",
+                objectFit: "cover",
+                border: "2px solid var(--c-primary)",
+              }}
+            />
+            <label
+              style={{
+                display: "inline-block",
+                background: "#111",
+                color: "#eee",
+                border: "1px solid #333",
+                borderRadius: 10,
+                padding: "8px 12px",
+                cursor: "pointer",
+                fontWeight: 700,
+              }}
+            >
+              Changer l’avatar
+              <input
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={(e) => onPickAvatarUpdate(e.target.files?.[0])}
+              />
+            </label>
+          </div>
+  
+          <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+            <button
+              onClick={onGoFriends}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,.08)",
+                background: "#111",
+                color: "#eee",
+                fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >
+              Voir mes amis
+            </button>
+  
+            <button
+              onClick={onLogout}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 12,
+                border: "none",
+                background: "#fbbf24",
+                color: "#111",
+                fontWeight: 900,
+                cursor: "pointer",
+              }}
+            >
+              Se déconnecter
+            </button>
+          </div>
+        </section>
+      );
+    }
+  
+    // ==========================
+    // État "pas connecté" (création/connexion)
+    // ==========================
     return (
-      <section style={{ padding: 20, textAlign: "center" }}>
-        <h2>Connecté en tant que <b>{account.name}</b></h2>
-        <button onClick={onLogout}>Se déconnecter</button>
-        <button onClick={onGoFriends} style={{ marginLeft: 10 }}>
-          Voir mes amis
-        </button>
-      </section>
-    );
-  }
-
-  return (
-    <section style={{ maxWidth: 360, margin: "40px auto", textAlign: "center" }}>
-      <h2>Connexion / Création de profil</h2>
-      <input
-        placeholder="Nom d'utilisateur"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        style={{ width: "100%", margin: "8px 0", padding: 8 }}
-      />
-      <input
-        placeholder="Mot de passe"
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        style={{ width: "100%", margin: "8px 0", padding: 8 }}
-      />
-      <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
-        <button onClick={() => onLogin(true)}>Se connecter</button>
-        <button
-          onClick={() =>
-            onCreate({ id: uid(), name, password, createdAt: Date.now() })
-          }
-        >
-          Créer un compte
-        </button>
-      </div>
-    </section>
-  );
-}
-
-function FriendsPage({ friends, setFriends, onBack }) {
-  return (
-    <section style={{ padding: 20 }}>
-      <h2>Mes amis</h2>
-      <ul>
-        {friends.map((f) => (
-          <li key={f.id}>{f.name}</li>
-        ))}
-      </ul>
-      <button onClick={onBack}>Retour</button>
-    </section>
-  );
-}
-
-function OnlineLobbyPage({ account, loggedIn, lobbies, setLobbies, onBack }) {
-  return (
-    <section style={{ padding: 20 }}>
-      <h2>Mode Online</h2>
-      {!loggedIn ? (
-        <div>Connecte-toi pour jouer en ligne.</div>
-      ) : (
-        <>
-          <p>Connecté en tant que <b>{account?.name}</b></p>
-          <ul>
-            {lobbies.map((l) => (
-              <li key={l.id}>{l.name || "Salle sans nom"}</li>
-            ))}
-          </ul>
+      <section style={{ maxWidth: 420, margin: "40px auto", textAlign: "center" }}>
+        <h2>Connexion / Création de compte</h2>
+  
+        {/* Aperçu avatar choisi (création) */}
+        {localAvatar && (
+          <div style={{ marginTop: 12, marginBottom: 8, display: "grid", placeItems: "center" }}>
+            <img
+              src={localAvatar}
+              alt="Aperçu avatar"
+              style={{
+                width: 84,
+                height: 84,
+                borderRadius: "50%",
+                objectFit: "cover",
+                border: "2px solid var(--c-primary)",
+              }}
+            />
+          </div>
+        )}
+  
+        {/* Choisir avatar (création) */}
+        <div style={{ marginBottom: 12 }}>
+          <label
+            style={{
+              display: "inline-block",
+              background: "#111",
+              color: "#eee",
+              border: "1px solid #333",
+              borderRadius: 10,
+              padding: "8px 12px",
+              cursor: "pointer",
+              fontWeight: 700,
+            }}
+          >
+            Choisir un avatar
+            <input
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={(e) => onPickAvatarCreate(e.target.files?.[0])}
+            />
+          </label>
+        </div>
+  
+        {/* Champs login */}
+        <input
+          placeholder="Nom d'utilisateur"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          style={{
+            width: "100%",
+            margin: "6px 0",
+            padding: 10,
+            borderRadius: 10,
+            border: "1px solid #333",
+            background: "#0f0f10",
+            color: "#eee",
+          }}
+        />
+        <input
+          placeholder="Mot de passe"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          style={{
+            width: "100%",
+            margin: "6px 0 12px",
+            padding: 10,
+            borderRadius: 10,
+            border: "1px solid #333",
+            background: "#0f0f10",
+            color: "#eee",
+          }}
+        />
+  
+        <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+          <button
+            onClick={() => onLogin(true)}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 12,
+              border: "1px solid rgba(255,255,255,.08)",
+              background: "#111",
+              color: "#eee",
+              fontWeight: 800,
+              cursor: "pointer",
+            }}
+          >
+            Se connecter
+          </button>
+  
           <button
             onClick={() =>
-              setLobbies([...lobbies, { id: uid(), name: `Salle ${lobbies.length + 1}` }])
+              onCreate({
+                id: uid(),
+                name: name.trim() || "Nouveau joueur",
+                password,
+                createdAt: Date.now(),
+                avatarDataUrl: localAvatar, // ✅ associe l’avatar au compte créé
+              })
             }
+            style={{
+              padding: "10px 14px",
+              borderRadius: 12,
+              border: "none",
+              background: "#fbbf24",
+              color: "#111",
+              fontWeight: 900,
+              cursor: "pointer",
+            }}
           >
-            Créer une salle
+            Créer un compte
           </button>
-        </>
-      )}
-      <button onClick={onBack} style={{ marginTop: 10 }}>
-        Retour
-      </button>
-    </section>
-  );
-}
+        </div>
+      </section>
+    );
+  }  
   
 /* =========================================
    Header (bouton installer PWA)
@@ -744,25 +899,28 @@ function Header({ onInstall }: { onInstall: () => void }) {
 }
 
 /* =========================================
-   Home (centré, sans logo, avec SE CONNECTER + Online)
+   Home (texte centré + avatar connecté)
    ========================================= */
    function Home({
+    account,
+    loggedIn,
     onGoProfiles,
     onGoGames,
-    onGoOnline = () => alert("Mode online indisponible."),
+    onGoOnline = () => alert("Le jeu en ligne arrive bientôt 👀"),
     onGoStats,
-    // callback login (redirige vers la page compte)
     onGoLogin = onGoProfiles,
   }: {
+    account?: Account | null;
+    loggedIn: boolean;
     onGoProfiles: () => void;
     onGoGames: () => void;
-    onGoOnline?: () => void; // -> route "online"
+    onGoOnline?: () => void;
     onGoStats: () => void;
-    onGoLogin?: () => void;  // -> route "account"
+    onGoLogin?: () => void;
   }) {
     return (
       <section style={{ display: "grid", gap: 24 }}>
-        {/* TITRE CENTRÉ */}
+        {/* === TITRE CENTRÉ === */}
         <div
           style={{
             minHeight: 220,
@@ -789,28 +947,85 @@ function Header({ onInstall }: { onInstall: () => void }) {
             DARTS COUNTER
           </div>
   
-          {/* Bouton SE CONNECTER (centre) */}
+          {/* === BOUTON SE CONNECTER ou AVATAR === */}
           <div style={{ marginTop: 14 }}>
-            <button
-              onClick={onGoLogin}
-              style={{
-                padding: "10px 16px",
-                borderRadius: 12,
-                border: "1px solid rgba(245,158,11,.35)",
-                background:
-                  "linear-gradient(180deg, rgba(245,158,11,.95), rgba(245,158,11,.75))",
-                color: "#111",
-                fontWeight: 900,
-                letterSpacing: 0.3,
-                cursor: "pointer",
-              }}
-            >
-              SE CONNECTER
-            </button>
+            {loggedIn && account ? (
+              <button
+                onClick={onGoLogin}
+                title={account?.name || "Mon compte"}
+                style={{
+                  borderRadius: 999,
+                  padding: 4,
+                  border: "1px solid rgba(245,158,11,.35)",
+                  background:
+                    "radial-gradient(140px 70px at 50% -20%, rgba(245,158,11,.18), rgba(245,158,11,.06))",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 10,
+                  cursor: "pointer",
+                }}
+              >
+                {/* Avatar ou initiales */}
+                {account?.avatarDataUrl ? (
+                  <img
+                    src={account.avatarDataUrl}
+                    alt={account.name}
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 999,
+                      objectFit: "cover",
+                      border: "1px solid #333",
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 999,
+                      display: "grid",
+                      placeItems: "center",
+                      fontWeight: 900,
+                      background: "#0f0f10",
+                      border: "1px solid #333",
+                      color: "var(--c-primary)",
+                    }}
+                  >
+                    {(account?.name || "?")
+                      .split(" ")
+                      .map((x) => x[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase()}
+                  </div>
+                )}
+                <span style={{ fontWeight: 900, color: "var(--c-primary)" }}>
+                  {account?.name || "Mon compte"}
+                </span>
+              </button>
+            ) : (
+              <button
+                onClick={onGoLogin}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 12,
+                  border: "1px solid rgba(245,158,11,.35)",
+                  background:
+                    "linear-gradient(180deg, rgba(245,158,11,.95), rgba(245,158,11,.75))",
+                  color: "#111",
+                  fontWeight: 900,
+                  letterSpacing: 0.3,
+                  cursor: "pointer",
+                }}
+              >
+                SE CONNECTER
+              </button>
+            )}
           </div>
         </div>
   
-        {/* BOUTONS PRINCIPAUX */}
+        {/* === BOUTONS PRINCIPAUX === */}
         <div
           style={{
             display: "grid",
@@ -818,53 +1033,54 @@ function Header({ onInstall }: { onInstall: () => void }) {
             gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
           }}
         >
-          {/* 1. PROFILS */}
+          {/* PROFILS */}
           <button onClick={onGoProfiles} style={buttonStyle}>
             <div style={titleRow}>
               <Icon name="user" />
               <b>PROFILS</b>
             </div>
-            <div style={descStyle}>Créer et gérer les profils locaux</div>
+            <div style={descStyle}>Création et gestion de profils</div>
           </button>
   
-          {/* 2. JEU LOCAL */}
+          {/* LOCAL */}
           <button onClick={onGoGames} style={buttonStyle}>
             <div style={titleRow}>
               <Icon name="dart" />
               <b>JEU LOCAL</b>
             </div>
-            <div style={descStyle}>Accède à tous les modes de jeu hors ligne</div>
+            <div style={descStyle}>Accède à tous les modes de jeu</div>
           </button>
   
-          {/* 3. JEU ONLINE */}
+          {/* ONLINE */}
           <button onClick={onGoOnline} style={buttonStyle}>
             <div style={titleRow}>
-              <Icon name="folder" />
+              <Icon name="wifi" />
               <b>JEU ONLINE</b>
             </div>
-            <div style={descStyle}>Créer / Rejoindre une salle par code</div>
+            <div style={descStyle}>Parties à distance (mode à venir)</div>
           </button>
   
-          {/* 4. STATS */}
+          {/* STATS */}
           <button onClick={onGoStats} style={buttonStyle}>
             <div style={titleRow}>
               <Icon name="chart" />
               <b>STATS</b>
             </div>
-            <div style={descStyle}>Statistiques et historiques de parties</div>
+            <div style={descStyle}>Statistiques et historiques</div>
           </button>
         </div>
       </section>
     );
   }
   
-  /* === STYLES COMMUNS === */
+  /* === Styles communs === */
   const buttonStyle: React.CSSProperties = {
     textAlign: "left",
     padding: 16,
     borderRadius: 16,
     border: "1px solid rgba(255,255,255,.08)",
-    background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
+    background:
+      "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
     display: "grid",
     gap: 8,
     cursor: "pointer",
