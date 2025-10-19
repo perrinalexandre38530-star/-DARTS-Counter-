@@ -622,106 +622,96 @@ function Header({ onInstall }: { onInstall: () => void }) {
 }
 
 /* =========================================
-   Home (avec logo + boutons d'accueil)
+   Home (texte centré, sans logo)
    ========================================= */
-   function Home({
-    onGoProfiles,
-    onGoGames,
-    onGoOnline = () => alert("Le jeu en ligne arrive bientôt 👀"),
-    onGoStats,
-  }: {
-    onGoProfiles: () => void;
-    onGoGames: () => void;
-    onGoOnline?: () => void;
-    onGoStats: () => void;
-  }) {
-    return (
-      <section style={{ display: "grid", gap: 24 }}>
-         {/* HEADER AVEC LOGO + TITRE */}
+function Home({
+  onGoProfiles,
+  onGoGames,
+  onGoOnline = () => alert("Le jeu en ligne arrive bientôt 👀"),
+  onGoStats,
+}: {
+  onGoProfiles: () => void;
+  onGoGames: () => void;
+  onGoOnline?: () => void;
+  onGoStats: () => void;
+}) {
+  return (
+    <section style={{ display: "grid", gap: 24 }}>
+      {/* TITRE CENTRÉ */}
+      <div
+        style={{
+          minHeight: 220,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          textAlign: "center",
+          gap: 6,
+        }}
+      >
+        <div style={{ fontSize: 18, opacity: 0.9 }}>Bienvenue,</div>
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 16,
-            marginBottom: 8,
+            fontWeight: 900,
+            fontSize: 34,
+            letterSpacing: 0.3,
+            color: "var(--c-primary)",
+            textTransform: "uppercase",
+            textShadow:
+              "0 3px 0 rgba(0,0,0,.55), 0 0 18px rgba(245,158,11,.25), 0 10px 16px rgba(0,0,0,.35)",
           }}
         >
-          <img
-            src="/LOGO DARTS COUNTER.png"
-            alt="Darts Counter Logo"
-            style={{
-              width: 150,
-              height: 150,
-              objectFit: "contain",
-              filter: "drop-shadow(0 0 8px rgba(245,158,11,.35))",
-            }}
-          />
-          <div style={{ textAlign: "left" }}>
-            <div style={{ fontSize: 18, opacity: 0.9 }}>Bienvenue</div>
-            <div
-              style={{
-                fontWeight: 900,
-                fontSize: 34,
-                letterSpacing: 0.3,
-                marginTop: 2,
-                color: "var(--c-primary)",
-                textShadow:
-                  "0 3px 0 rgba(0,0,0,.55), 0 0 18px rgba(245,158,11,.25), 0 10px 16px rgba(0,0,0,.35)",
-              }}
-            >
-              DARTS COUNTER
-            </div>
+          DARTS COUNTER
+        </div>
+      </div>
+
+      {/* === BOUTONS PRINCIPAUX (inchangés) === */}
+      <div
+        style={{
+          display: "grid",
+          gap: 12,
+          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+        }}
+      >
+        {/* 1. PROFILS */}
+        <button onClick={onGoProfiles} style={buttonStyle}>
+          <div style={titleRow}>
+            <Icon name="user" />
+            <b>PROFILS</b>
           </div>
-        </div>
-  
-        {/* === BOUTONS PRINCIPAUX === */}
-        <div
-          style={{
-            display: "grid",
-            gap: 12,
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-          }}
-        >
-          {/* 1. PROFILS */}
-          <button
-            onClick={onGoProfiles}
-            style={buttonStyle}
-          >
-            <div style={titleRow}><Icon name="user" /><b>PROFILS</b></div>
-            <div style={descStyle}>Création et gestion de profils</div>
-          </button>
-  
-          {/* 2. JEU LOCAL */}
-          <button
-            onClick={onGoGames}
-            style={buttonStyle}
-          >
-            <div style={titleRow}><Icon name="dart" /><b>JEU LOCAL</b></div>
-            <div style={descStyle}>Accède à tous les modes de jeu</div>
-          </button>
-  
-          {/* 3. JEU ONLINE */}
-          <button
-            onClick={onGoOnline}
-            style={buttonStyle}
-          >
-            <div style={titleRow}><Icon name="folder" /><b>JEU ONLINE</b></div>
-            <div style={descStyle}>Fonctionnalité à venir (parties à distance)</div>
-          </button>
-  
-          {/* 4. STATS */}
-          <button
-            onClick={onGoStats}
-            style={buttonStyle}
-          >
-            <div style={titleRow}><Icon name="chart" /><b>STATS</b></div>
-            <div style={descStyle}>Statistiques et historiques de parties</div>
-          </button>
-        </div>
-      </section>
-    );
-  }
+          <div style={descStyle}>Création et gestion de profils</div>
+        </button>
+
+        {/* 2. JEU LOCAL */}
+        <button onClick={onGoGames} style={buttonStyle}>
+          <div style={titleRow}>
+            <Icon name="dart" />
+            <b>JEU LOCAL</b>
+          </div>
+          <div style={descStyle}>Accède à tous les modes de jeu</div>
+        </button>
+
+        {/* 3. JEU ONLINE */}
+        <button onClick={onGoOnline} style={buttonStyle}>
+          <div style={titleRow}>
+            <Icon name="folder" />
+            <b>JEU ONLINE</b>
+          </div>
+          <div style={descStyle}>Fonctionnalité à venir (parties à distance)</div>
+        </button>
+
+        {/* 4. STATS */}
+        <button onClick={onGoStats} style={buttonStyle}>
+          <div style={titleRow}>
+            <Icon name="chart" />
+            <b>STATS</b>
+          </div>
+          <div style={descStyle}>Statistiques et historiques de parties</div>
+        </button>
+      </div>
+    </section>
+  );
+}
   
   /* === STYLES COMMUNS === */
   const buttonStyle: React.CSSProperties = {
