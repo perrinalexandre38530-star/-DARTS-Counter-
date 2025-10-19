@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import StatsPage from "./pages/StatsPage";
 
 /* =========================================
    Utils
@@ -359,49 +360,6 @@ function GameStatsPage({
     </section>
   );
 }
-
-/* =========================================
-   StatsPage (stub simple)
-   ========================================= */
-   function StatsPage({ profiles }: { profiles: Profile[] }) {
-    return (
-      <section style={{ display: "grid", gap: 12 }}>
-        <div style={{ fontWeight: 800, fontSize: 18 }}>Stats (aperçu)</div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-            gap: 10,
-          }}
-        >
-          {profiles.map((p) => (
-            <div
-              key={p.id}
-              style={{
-                border: "1px solid rgba(255,255,255,.08)",
-                background:
-                  "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
-                borderRadius: 12,
-                padding: 12,
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-              }}
-            >
-              <Avatar name={p.name} src={p.avatarDataUrl} size={64} />
-              <div>
-                <div style={{ fontWeight: 800 }}>{p.name}</div>
-                <div style={{ fontSize: 12, opacity: 0.75 }}>
-                  {p.stats?.games ?? 0} parties · {p.stats?.legs ?? 0} legs ·{" "}
-                  {p.stats?.darts ?? 0} darts
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-    );
-  }
 
   /* =========================================
    TeamsPage — création / renommage / couleur
@@ -1520,6 +1478,8 @@ function GamesHub({
 
 /* =========================================
    ProfilesPage — colonne unique (compte + amis + création + liste)
+   - Ajout: éditer/supprimer un profil depuis la liste déroulante
+   - Aucun profil local pré-créé au lancement (laissez [] en state parent)
    ========================================= */
    function ProfilesPage({
     profiles, setProfiles, account, loggedIn, onOpenAccount,
@@ -1563,7 +1523,7 @@ function GamesHub({
     }
   
     function addProfile() {
-      const name = newName.trim() || `Joueur ${profiles.length + 1}`;
+      const name = newName.trim() || `Joueur ${displayProfiles.length + 1}`;
       const p: Profile = {
         id: uid(),
         name,
@@ -1573,10 +1533,59 @@ function GamesHub({
       setProfiles((arr: Profile[]) => [...arr, p]);
       setNewName("");
       setNewAvatar(undefined);
+      // Si aucun sélectionné, sélectionner le nouveau
+      setSelectedId(prev => prev || p.id);
+      setEditName(""); // reset zone d'édition
     }
   
-    // --- Liste déroulante : sélection simple ---
+    // --- Liste déroulante : sélection + édition/suppression ---
     const [selectedId, setSelectedId] = useState<string>("");
+    const selectedProfile = useMemo(
+      () => displayProfiles.find(p => p.id === selectedId),
+      [displayProfiles, selectedId]
+    );
+  
+    // maintenir la sélection cohérente quand la liste change
+    useEffect(() => {
+      if (!selectedId) return;
+      if (!displayProfiles.some(p => p.id === selectedId)) {
+        setSelectedId(displayProfiles[0]?.id ?? "");
+      }
+    }, [displayProfiles, selectedId]);
+  
+    // Édition du nom/avatar du profil sélectionné
+    const [editName, setEditName] = useState<string>("");
+  
+    useEffect(() => {
+      // mettre à jour le champ d'édition quand on change de sélection
+      setEditName(selectedProfile?.name ?? "");
+    }, [selectedId, selectedProfile?.name]);
+  
+    function renameSelected() {
+      if (!selectedProfile) return;
+      const name = (editName ?? "").trim();
+      if (!name) return;
+      setProfiles((arr: Profile[]) =>
+        arr.map(p => (p.id === selectedProfile.id ? { ...p, name } : p))
+      );
+    }
+  
+    async function changeSelectedAvatar(file?: File) {
+      if (!selectedProfile || !file) return;
+      const url = await fileToDataURL(file);
+      setProfiles((arr: Profile[]) =>
+        arr.map(p => (p.id === selectedProfile.id ? { ...p, avatarDataUrl: url } : p))
+      );
+    }
+  
+    function deleteSelected() {
+      if (!selectedProfile) return;
+      const ok = window.confirm(`Supprimer le profil « ${selectedProfile.name} » ?`);
+      if (!ok) return;
+      setProfiles((arr: Profile[]) => arr.filter(p => p.id !== selectedProfile.id));
+      setSelectedId("");
+      setEditName("");
+    }
   
     // --- Bloc Amis (lecture depuis localStorage, optionnel) ---
     type MiniFriend = { id: string; name: string; online?: boolean };
@@ -1651,7 +1660,7 @@ function GamesHub({
           </div>
         </div>
   
-        {/* --- Encadré fusionné : Créer un profil + Liste déroulante + Liste complète --- */}
+        {/* --- Encadré fusionné : Créer un profil + Liste déroulante + Liste + Edition/Suppression --- */}
         <div
           style={{
             border: "1px solid rgba(255,255,255,.08)",
@@ -1749,7 +1758,7 @@ function GamesHub({
             </div>
           </div>
   
-          {/* Liste déroulante des profils */}
+          {/* Liste déroulante + actions d'édition */}
           <div>
             <label style={{ fontWeight: 700, fontSize: 13, opacity: 0.8 }}>Profils locaux</label>
             <select
@@ -1768,11 +1777,102 @@ function GamesHub({
               {displayProfiles.length === 0 ? (
                 <option value="" disabled>Aucun profil local</option>
               ) : (
-                displayProfiles.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))
+                <>
+                  <option value="" disabled>— sélectionner —</option>
+                  {displayProfiles.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </>
               )}
             </select>
+  
+            {/* Zone d'édition du profil sélectionné */}
+            {selectedProfile && (
+              <div
+                style={{
+                  marginTop: 8,
+                  border: "1px dashed rgba(255,255,255,.18)",
+                  borderRadius: 10,
+                  padding: 8,
+                  display: "grid",
+                  gap: 8,
+                  background: "rgba(0,0,0,.15)",
+                }}
+              >
+                <div style={{ fontWeight: 700, opacity: .9 }}>Modifier « {selectedProfile.name} »</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="Nouveau nom"
+                    style={{
+                      flex: 1,
+                      padding: "8px 10px",
+                      borderRadius: 10,
+                      border: "1px solid #333",
+                      background: "#0f0f10",
+                      color: "#eee",
+                      fontSize: 14,
+                    }}
+                  />
+                  <button
+                    onClick={renameSelected}
+                    style={{
+                      borderRadius: 10,
+                      background: "#eab308",
+                      border: "none",
+                      color: "#111",
+                      fontWeight: 900,
+                      padding: "0 12px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Renommer
+                  </button>
+                </div>
+  
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <Avatar name={selectedProfile.name} src={selectedProfile.avatarDataUrl} size={52} />
+                  <label
+                    style={{
+                      flex: 1,
+                      padding: "8px 10px",
+                      borderRadius: 10,
+                      border: "1px solid rgba(255,255,255,.08)",
+                      background: "#111",
+                      color: "#eee",
+                      cursor: "pointer",
+                      textAlign: "center",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Changer l’avatar
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      onChange={(e) => changeSelectedAvatar(e.target.files?.[0])}
+                    />
+                  </label>
+  
+                  <button
+                    onClick={deleteSelected}
+                    style={{
+                      borderRadius: 10,
+                      background: "#ef4444",
+                      border: "none",
+                      color: "white",
+                      fontWeight: 900,
+                      padding: "0 12px",
+                      cursor: "pointer",
+                    }}
+                    title="Supprimer le profil"
+                  >
+                    Supprimer
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
   
           {/* Liste complète dessous */}
@@ -1796,19 +1896,45 @@ function GamesHub({
                 }}
               >
                 <Avatar name={p.name} src={p.avatarDataUrl} />
-                <div>
+                <div style={{ flex: 1 }}>
                   <div>{p.name}</div>
                   <div style={{ fontSize: 12, opacity: 0.7 }}>
                     {p.stats?.games ?? 0} parties · {p.stats?.legs ?? 0} legs · {p.stats?.darts ?? 0} darts
                   </div>
                 </div>
+                {/* Actions rapides par carte (optionnel) */}
+                <button
+                  onClick={() => { setSelectedId(p.id); setEditName(p.name); }}
+                  style={{
+                    borderRadius: 8, border: "1px solid #333", background: "#151515",
+                    color: "#ddd", fontSize: 12, padding: "6px 10px", cursor: "pointer"
+                  }}
+                >
+                  Éditer
+                </button>
+                <button
+                  onClick={() => {
+                    const ok = window.confirm(`Supprimer le profil « ${p.name} » ?`);
+                    if (!ok) return;
+                    setProfiles((arr: Profile[]) => arr.filter(x => x.id !== p.id));
+                    setSelectedId(prev => (prev === p.id ? "" : prev));
+                    setEditName(prev => (prev && prev === p.name ? "" : prev));
+                  }}
+                  style={{
+                    borderRadius: 8, border: "none", background: "#ef4444",
+                    color: "white", fontSize: 12, padding: "6px 10px", cursor: "pointer"
+                  }}
+                  title="Supprimer le profil"
+                >
+                  Suppr.
+                </button>
               </div>
             ))}
           </div>
         </div>
       </section>
     );
-  }  
+  }
   
 /* =========================================
    LobbyPage (profil-compte en tête + badge "COMPTE")
