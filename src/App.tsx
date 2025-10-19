@@ -109,7 +109,12 @@ type Mode =
   | "Finish 121"
   | "Training";
 
-  type Route = 'home' | 'games' | 'lobby' | 'game' | 'gamestats' | 'profiles' | 'stats' | 'teams' | 'settings';
+  type Route =
+  | 'home' | 'games' | 'lobby' | 'game' | 'gamestats'
+  | 'profiles' | 'stats' | 'teams' | 'settings'
+  | 'account'   // page compte / connexion
+  | 'friends'   // amis online
+  | 'online';   // lobby online (créer/rejoindre une salle)
 
 /* ---------- Events / Games (journal & historique) ---------- */
 type Dart = { mult: 1 | 2 | 3; val: number }; // 25 = bull (DB si mult===2)
@@ -134,6 +139,18 @@ type GameRecord = {
   winnerId?: string;
   notes?: string;
 };
+
+// === Online / Compte / Amis ===
+
+type Account = {
+  id: string;
+  name: string;
+  password: string;
+  createdAt: number;
+};
+type Friend = { id: string; name: string };
+type Lobby = { id: string; name: string };
+
 
 /* =========================================
    Defaults
@@ -349,7 +366,7 @@ export default function App() {
   const [route, setRoute] = useLocalStorage<Route>("dc.route", "home");
   const [arcade, setArcade] = useLocalStorage<boolean>("dc.arcade", false);
 
-  // Data
+  // Données locales
   const [teams, setTeams] = useLocalStorage<Team[]>("dc.teams", []);
   const [profiles, setProfiles] = useLocalStorage<Profile[]>("dc.profiles", [
     { id: uid(), name: "Profil 1", stats: { games: 0, legs: 0, sets: 0, darts: 0 } },
@@ -365,6 +382,12 @@ export default function App() {
   const [games, setGames] = useLocalStorage<GameRecord[]>("dc.games", []);
   const [currentGameId, setCurrentGameId] = useLocalStorage<string | null>("dc.currentGameId", null);
 
+  // Comptes / Online
+  const [account, setAccount] = useLocalStorage<Account | null>("dc.account", null);
+  const [loggedIn, setLoggedIn] = useLocalStorage<boolean>("dc.session", false);
+  const [friends, setFriends] = useLocalStorage<Friend[]>("dc.friends", []);
+  const [lobbies, setLobbies] = useLocalStorage<Lobby[]>("dc.lobbies", []);
+
   // PWA install prompt
   const deferredPrompt = useRef<any>(null);
   useEffect(() => {
@@ -376,24 +399,23 @@ export default function App() {
     return () => window.removeEventListener("beforeinstallprompt", onBip);
   }, []);
 
-// Réglages voix
-const [ttsEnabled, setTtsEnabled] = useLocalStorage<boolean>("dc.tts.enabled", false);
-const [ttsLang, setTtsLang] = useLocalStorage<string>("dc.tts.lang", "fr-FR");
+  // Réglages voix
+  const [ttsEnabled, setTtsEnabled] = useLocalStorage<boolean>("dc.tts.enabled", false);
+  const [ttsLang, setTtsLang] = useLocalStorage<string>("dc.tts.lang", "fr-FR");
 
-// Utilitaire: dire un texte selon les réglages
-function speak(text: string) {
-  try {
-    if (!ttsEnabled) return;
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = ttsLang;   // "fr-FR" ou "en-US"
-    u.rate = 1;         // vitesse (1 = normal)
-    u.pitch = 1;        // timbre
-    window.speechSynthesis.cancel(); // évite l'empilement
-    window.speechSynthesis.speak(u);
-  } catch {}
-}
-  
+  function speak(text: string) {
+    try {
+      if (!ttsEnabled) return;
+      if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = ttsLang;
+      u.rate = 1;
+      u.pitch = 1;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(u);
+    } catch {}
+  }
+
   // Theme apply
   useEffect(() => {
     const r = document.documentElement;
@@ -401,7 +423,7 @@ function speak(text: string) {
     r.style.setProperty("--c-text", DEFAULT_THEME.text);
   }, []);
 
-  // Start lobby from GamesHub
+  // Depuis GamesHub → Lobby
   function startLobby(m: Mode) {
     setMode(m);
     setRoute("lobby");
@@ -415,55 +437,12 @@ function speak(text: string) {
     }
     return a;
   }
-  
+
   // Launch game from Lobby
   function launchGame(selected: Player[], customRules?: MatchRules) {
-    function launchGame(selected: Player[], customRules?: MatchRules) {
-      const r = customRules || rules;
-    
-      // ← NEW: ordre aléatoire si activé
-      const ordered = r.randomOrder ? shuffle(selected) : selected;
-    
-      // crée l’ID de partie, etc.
-      const gameId = uid();
-      setGames((gs) => [
-        ...gs,
-        {
-          id: gameId,
-          mode,
-          startedAt: Date.now(),
-          players: ordered.map((p) => ({ profileId: p.profileId || p.id, name: p.name })),
-        },
-      ]);
-      setCurrentGameId(gameId);
-    
-      // instancie les joueurs pour la manche (en respectant l’ordre tiré)
-      const js = ordered.map((p) => ({
-        id: uid(),
-        name: p.name,
-        profileId: p.profileId || undefined,
-        avatarDataUrl: p.avatarDataUrl,
-        teamId: p.teamId,
-        x01Score: r.startingScore,
-        legs: 0,
-        sets: 0,
-        dartsUsed: 0,
-        lastScore: 0,
-        points: 0,
-        lives: 3,
-        atcTarget: 1,
-        killerTarget: (p as any).killerTarget, // si tu gères déjà ces champs
-        isKiller: (p as any).isKiller,
-        shanghaiRound: 1,
-      }));
-    
-      setPlayers(js);
-      setActiveId(js[0]?.id || "");
-      if (customRules) setRules(customRules);
-      setRoute("game");
-    }
-    
-    // crée une partie
+    const r = customRules || rules;
+    const ordered = r.randomOrder ? shuffle(selected) : selected;
+
     const gameId = uid();
     setGames((gs) => [
       ...gs,
@@ -471,14 +450,12 @@ function speak(text: string) {
         id: gameId,
         mode,
         startedAt: Date.now(),
-        players: selected.map((p) => ({ profileId: p.profileId || p.id, name: p.name })),
+        players: ordered.map((p) => ({ profileId: p.profileId || p.id, name: p.name })),
       },
     ]);
     setCurrentGameId(gameId);
 
-    // instancie les joueurs pour la manche
-    const r = customRules || rules;
-    const js = selected.map((p) => ({
+    const js = ordered.map((p) => ({
       id: uid(),
       name: p.name,
       profileId: p.profileId || undefined,
@@ -494,11 +471,11 @@ function speak(text: string) {
       points: 0,
       lives: 3,
       atcTarget: 1,
-      // ↓↓↓ init Killer / Shanghai
-      killerTarget: undefined, // sera attribué au premier rendu GamePage
-      isKiller: false,
+      killerTarget: (p as any).killerTarget,
+      isKiller: (p as any).isKiller,
       shanghaiRound: 1,
-    }));    
+    }));
+
     setPlayers(js);
     setActiveId(js[0]?.id || "");
     if (customRules) setRules(customRules);
@@ -518,22 +495,38 @@ function speak(text: string) {
       }}
     >
       <GlobalStyles />
-
       <TopGlassNav route={route} setRoute={setRoute} />
 
       <main style={{ maxWidth: 1000, margin: "0 auto", padding: 16 }}>
         {route === "home" && (
-          <Home onGoGames={() => setRoute("games")} onGoProfiles={() => setRoute("profiles")} />
+          <Home
+            onGoGames={() => setRoute("games")}
+            onGoProfiles={() => setRoute("profiles")}
+            onGoStats={() => setRoute("stats")}
+            onGoOnline={() => setRoute("online")}
+            onGoLogin={() => setRoute("account")}
+          />
         )}
 
         {route === "games" && <GamesHub current={mode} onPick={startLobby} />}
 
         {route === "profiles" && (
-          <ProfilesPage profiles={profiles} setProfiles={setProfiles} teams={teams} setTeams={setTeams} events={events} />
+          <ProfilesPage
+            profiles={profiles}
+            setProfiles={setProfiles}
+            teams={teams}
+            setTeams={setTeams}
+            events={events}
+          />
         )}
 
         {route === "allgames" && (
-          <AllGamesPage games={games} events={events} profiles={profiles} onOpen={(id) => console.log("open", id)} />
+          <AllGamesPage
+            games={games}
+            events={events}
+            profiles={profiles}
+            onOpen={(id) => console.log("open", id)}
+          />
         )}
 
         {route === "lobby" && (
@@ -548,8 +541,8 @@ function speak(text: string) {
           />
         )}
 
-       {route === "game" && (
-         <GamePage
+        {route === "game" && (
+          <GamePage
             mode={mode}
             rules={rules}
             players={players}
@@ -557,34 +550,70 @@ function speak(text: string) {
             activeId={activeId}
             setActiveId={setActiveId}
             onEnd={() => setRoute("home")}
-            speak={speak}          // <-- ajout
-            ttsLang={ttsLang}      // <-- ajout
-        />
+            speak={speak}
+            ttsLang={ttsLang}
+          />
         )}
-        
+
         {route === "gamestats" && (
-  <GameStatsPage
-    players={players}
-    onBack={() => setRoute("game")}
-  />
-)}
+          <GameStatsPage players={players} onBack={() => setRoute("game")} />
+        )}
 
         {route === "stats" && <StatsPage profiles={profiles} />}
 
         {route === "teams" && <TeamsPage teams={teams} setTeams={setTeams} />}
 
         {route === "settings" && (
-  <SettingsPage
-    rules={rules}
-    setRules={setRules}
-    arcade={arcade}
-    setArcade={setArcade}
-    ttsEnabled={ttsEnabled}        // ✅ nouvelle prop
-    setTtsEnabled={setTtsEnabled}  // ✅ nouvelle prop
-    ttsLang={ttsLang}              // ✅ nouvelle prop
-    setTtsLang={setTtsLang}        // ✅ nouvelle prop
-  />
-)}
+          <SettingsPage
+            rules={rules}
+            setRules={setRules}
+            arcade={arcade}
+            setArcade={setArcade}
+            ttsEnabled={ttsEnabled}
+            setTtsEnabled={setTtsEnabled}
+            ttsLang={ttsLang}
+            setTtsLang={setTtsLang}
+          />
+        )}
+
+        {/* === NOUVELLES ROUTES === */}
+        {route === "account" && (
+          <AccountPage
+            account={account}
+            loggedIn={loggedIn}
+            onCreate={(acc) => {
+              setAccount(acc);
+              setLoggedIn(true);
+              setRoute("home");
+            }}
+            onLogin={(ok) => {
+              if (ok) {
+                setLoggedIn(true);
+                setRoute("home");
+              }
+            }}
+            onLogout={() => setLoggedIn(false)}
+            onGoFriends={() => setRoute("friends")}
+          />
+        )}
+
+        {route === "friends" && (
+          <FriendsPage
+            friends={friends}
+            setFriends={setFriends}
+            onBack={() => setRoute("account")}
+          />
+        )}
+
+        {route === "online" && (
+          <OnlineLobbyPage
+            account={account}
+            loggedIn={loggedIn}
+            lobbies={lobbies}
+            setLobbies={setLobbies}
+            onBack={() => setRoute("home")}
+          />
+        )}
       </main>
 
       <BottomNav route={route} setRoute={setRoute} />
@@ -592,6 +621,99 @@ function speak(text: string) {
   );
 }
 
+/* =========================================
+   Account / Friends / Online pages (basiques)
+   ========================================= */
+function AccountPage({ account, loggedIn, onCreate, onLogin, onLogout, onGoFriends }) {
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+
+  if (loggedIn && account) {
+    return (
+      <section style={{ padding: 20, textAlign: "center" }}>
+        <h2>Connecté en tant que <b>{account.name}</b></h2>
+        <button onClick={onLogout}>Se déconnecter</button>
+        <button onClick={onGoFriends} style={{ marginLeft: 10 }}>
+          Voir mes amis
+        </button>
+      </section>
+    );
+  }
+
+  return (
+    <section style={{ maxWidth: 360, margin: "40px auto", textAlign: "center" }}>
+      <h2>Connexion / Création de profil</h2>
+      <input
+        placeholder="Nom d'utilisateur"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        style={{ width: "100%", margin: "8px 0", padding: 8 }}
+      />
+      <input
+        placeholder="Mot de passe"
+        type="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        style={{ width: "100%", margin: "8px 0", padding: 8 }}
+      />
+      <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+        <button onClick={() => onLogin(true)}>Se connecter</button>
+        <button
+          onClick={() =>
+            onCreate({ id: uid(), name, password, createdAt: Date.now() })
+          }
+        >
+          Créer un compte
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function FriendsPage({ friends, setFriends, onBack }) {
+  return (
+    <section style={{ padding: 20 }}>
+      <h2>Mes amis</h2>
+      <ul>
+        {friends.map((f) => (
+          <li key={f.id}>{f.name}</li>
+        ))}
+      </ul>
+      <button onClick={onBack}>Retour</button>
+    </section>
+  );
+}
+
+function OnlineLobbyPage({ account, loggedIn, lobbies, setLobbies, onBack }) {
+  return (
+    <section style={{ padding: 20 }}>
+      <h2>Mode Online</h2>
+      {!loggedIn ? (
+        <div>Connecte-toi pour jouer en ligne.</div>
+      ) : (
+        <>
+          <p>Connecté en tant que <b>{account?.name}</b></p>
+          <ul>
+            {lobbies.map((l) => (
+              <li key={l.id}>{l.name || "Salle sans nom"}</li>
+            ))}
+          </ul>
+          <button
+            onClick={() =>
+              setLobbies([...lobbies, { id: uid(), name: `Salle ${lobbies.length + 1}` }])
+            }
+          >
+            Créer une salle
+          </button>
+        </>
+      )}
+      <button onClick={onBack} style={{ marginTop: 10 }}>
+        Retour
+      </button>
+    </section>
+  );
+}
+  
 /* =========================================
    Header (bouton installer PWA)
    ========================================= */
@@ -622,120 +744,119 @@ function Header({ onInstall }: { onInstall: () => void }) {
 }
 
 /* =========================================
-   Home (texte centré, sans logo + bouton Se connecter)
+   Home (centré, sans logo, avec SE CONNECTER + Online)
    ========================================= */
-function Home({
-  onGoProfiles,
-  onGoGames,
-  onGoOnline = () => alert("Le jeu en ligne arrive bientôt 👀"),
-  onGoStats,
-  // ✅ nouveau : callback login (par défaut → profils)
-  onGoLogin = onGoProfiles,
-}: {
-  onGoProfiles: () => void;
-  onGoGames: () => void;
-  onGoOnline?: () => void;
-  onGoStats: () => void;
-  onGoLogin?: () => void;
-}) {
-  return (
-    <section style={{ display: "grid", gap: 24 }}>
-      {/* TITRE CENTRÉ */}
-      <div
-        style={{
-          minHeight: 220,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          textAlign: "center",
-          gap: 6,
-        }}
-      >
-        <div style={{ fontSize: 18, opacity: 0.9 }}>Bienvenue,</div>
+   function Home({
+    onGoProfiles,
+    onGoGames,
+    onGoOnline = () => alert("Mode online indisponible."),
+    onGoStats,
+    // callback login (redirige vers la page compte)
+    onGoLogin = onGoProfiles,
+  }: {
+    onGoProfiles: () => void;
+    onGoGames: () => void;
+    onGoOnline?: () => void; // -> route "online"
+    onGoStats: () => void;
+    onGoLogin?: () => void;  // -> route "account"
+  }) {
+    return (
+      <section style={{ display: "grid", gap: 24 }}>
+        {/* TITRE CENTRÉ */}
         <div
           style={{
-            fontWeight: 900,
-            fontSize: 34,
-            letterSpacing: 0.3,
-            color: "var(--c-primary)",
-            textTransform: "uppercase",
-            textShadow:
-              "0 3px 0 rgba(0,0,0,.55), 0 0 18px rgba(245,158,11,.25), 0 10px 16px rgba(0,0,0,.35)",
+            minHeight: 220,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+            gap: 6,
           }}
         >
-          DARTS COUNTER
-        </div>
-
-        {/* ✅ Bouton SE CONNECTER (au centre) */}
-        <div style={{ marginTop: 14 }}>
-          <button
-            onClick={onGoLogin}
+          <div style={{ fontSize: 18, opacity: 0.9 }}>Bienvenue,</div>
+          <div
             style={{
-              padding: "10px 16px",
-              borderRadius: 12,
-              border: "1px solid rgba(245,158,11,.35)",
-              background:
-                "linear-gradient(180deg, rgba(245,158,11,.95), rgba(245,158,11,.75))",
-              color: "#111",
               fontWeight: 900,
+              fontSize: 34,
               letterSpacing: 0.3,
-              cursor: "pointer",
+              color: "var(--c-primary)",
+              textTransform: "uppercase",
+              textShadow:
+                "0 3px 0 rgba(0,0,0,.55), 0 0 18px rgba(245,158,11,.25), 0 10px 16px rgba(0,0,0,.35)",
             }}
           >
-            SE CONNECTER
+            DARTS COUNTER
+          </div>
+  
+          {/* Bouton SE CONNECTER (centre) */}
+          <div style={{ marginTop: 14 }}>
+            <button
+              onClick={onGoLogin}
+              style={{
+                padding: "10px 16px",
+                borderRadius: 12,
+                border: "1px solid rgba(245,158,11,.35)",
+                background:
+                  "linear-gradient(180deg, rgba(245,158,11,.95), rgba(245,158,11,.75))",
+                color: "#111",
+                fontWeight: 900,
+                letterSpacing: 0.3,
+                cursor: "pointer",
+              }}
+            >
+              SE CONNECTER
+            </button>
+          </div>
+        </div>
+  
+        {/* BOUTONS PRINCIPAUX */}
+        <div
+          style={{
+            display: "grid",
+            gap: 12,
+            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+          }}
+        >
+          {/* 1. PROFILS */}
+          <button onClick={onGoProfiles} style={buttonStyle}>
+            <div style={titleRow}>
+              <Icon name="user" />
+              <b>PROFILS</b>
+            </div>
+            <div style={descStyle}>Créer et gérer les profils locaux</div>
+          </button>
+  
+          {/* 2. JEU LOCAL */}
+          <button onClick={onGoGames} style={buttonStyle}>
+            <div style={titleRow}>
+              <Icon name="dart" />
+              <b>JEU LOCAL</b>
+            </div>
+            <div style={descStyle}>Accède à tous les modes de jeu hors ligne</div>
+          </button>
+  
+          {/* 3. JEU ONLINE */}
+          <button onClick={onGoOnline} style={buttonStyle}>
+            <div style={titleRow}>
+              <Icon name="folder" />
+              <b>JEU ONLINE</b>
+            </div>
+            <div style={descStyle}>Créer / Rejoindre une salle par code</div>
+          </button>
+  
+          {/* 4. STATS */}
+          <button onClick={onGoStats} style={buttonStyle}>
+            <div style={titleRow}>
+              <Icon name="chart" />
+              <b>STATS</b>
+            </div>
+            <div style={descStyle}>Statistiques et historiques de parties</div>
           </button>
         </div>
-      </div>
-
-      {/* === BOUTONS PRINCIPAUX (inchangés) === */}
-      <div
-        style={{
-          display: "grid",
-          gap: 12,
-          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-        }}
-      >
-        {/* 1. PROFILS */}
-        <button onClick={onGoProfiles} style={buttonStyle}>
-          <div style={titleRow}>
-            <Icon name="user" />
-            <b>PROFILS</b>
-          </div>
-          <div style={descStyle}>Création et gestion de profils</div>
-        </button>
-
-        {/* 2. JEU LOCAL */}
-        <button onClick={onGoGames} style={buttonStyle}>
-          <div style={titleRow}>
-            <Icon name="dart" />
-            <b>JEU LOCAL</b>
-          </div>
-          <div style={descStyle}>Accède à tous les modes de jeu</div>
-        </button>
-
-        {/* 3. JEU ONLINE */}
-        <button onClick={onGoOnline} style={buttonStyle}>
-          <div style={titleRow}>
-            <Icon name="folder" />
-            <b>JEU ONLINE</b>
-          </div>
-          <div style={descStyle}>Fonctionnalité à venir (parties à distance)</div>
-        </button>
-
-        {/* 4. STATS */}
-        <button onClick={onGoStats} style={buttonStyle}>
-          <div style={titleRow}>
-            <Icon name="chart" />
-            <b>STATS</b>
-          </div>
-          <div style={descStyle}>Statistiques et historiques de parties</div>
-        </button>
-      </div>
-    </section>
-  );
-}
-
+      </section>
+    );
+  }
   
   /* === STYLES COMMUNS === */
   const buttonStyle: React.CSSProperties = {
@@ -743,8 +864,7 @@ function Home({
     padding: 16,
     borderRadius: 16,
     border: "1px solid rgba(255,255,255,.08)",
-    background:
-      "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
+    background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
     display: "grid",
     gap: 8,
     cursor: "pointer",
@@ -764,7 +884,7 @@ function Home({
     opacity: 0.8,
     fontSize: 13,
     color: "#ccc",
-  };  
+  };   
 
 /* =========================================
    GamesHub (placeholder)
@@ -1732,7 +1852,7 @@ function ProfilesPage({
       checked={!!rules.randomOrder}
       onChange={(e) => setRules({ ...rules, randomOrder: e.target.checked })}
     />
-    Tirage **aléatoire** de l’ordre des joueurs au début de la partie
+    Tirage <b>aléatoire</b> de l’ordre des joueurs au début de la partie
   </label>
 </div>
   
