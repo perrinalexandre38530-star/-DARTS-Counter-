@@ -1762,306 +1762,315 @@ function GamesHub({
     );
   }    
 
-  /* =========================================
-   LobbyPage — auto-sélection du compte + badge
+/* =========================================
+   LobbyPage (profil-compte en tête + badge "COMPTE")
    ========================================= */
-function LobbyPage({
-  mode,
-  teams,
-  profiles,
-  rules,
-  setRules,
-  onStart,
-  onBack,
-}: {
-  mode: Mode;
-  teams: Team[];
-  profiles: Profile[];
-  rules: MatchRules;
-  setRules: (r: MatchRules) => void;
-  onStart: (players: Player[], customRules?: MatchRules) => void;
-  onBack: () => void;
-}) {
-  // état local
-  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
-  const [localRules, setLocalRules] = React.useState<MatchRules>(rules);
-
-  // ➜ Auto-pré-sélection du profil du compte s’il existe
-  React.useEffect(() => {
-    const acc = profiles.find(p => p.id.startsWith("acc:"))?.id;
-    if (!acc) return;
-    setSelectedIds((ids) => (ids.includes(acc) ? ids : [acc, ...ids]));
-  }, [profiles]);
-
-  // shuffle Fisher–Yates
-  function shuffle<T>(arr: T[]): T[] {
-    const a = [...arr];
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
+   function LobbyPage({
+    mode,
+    teams,
+    profiles,
+    rules,
+    setRules,
+    onStart,
+    onBack,
+  }: {
+    mode: Mode;
+    teams: Team[];
+    profiles: Profile[];
+    rules: MatchRules;
+    setRules: (r: MatchRules) => void;
+    onStart: (players: Player[], customRules?: MatchRules) => void;
+    onBack: () => void;
+  }) {
+    // état local
+    const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
+    const [localRules, setLocalRules] = React.useState<MatchRules>(rules);
+  
+    // place le/les profils "acc:..." en tête de liste
+    const sortedProfiles = React.useMemo(() => {
+      const acc = profiles.filter(p => p.id.startsWith("acc:"));
+      const others = profiles.filter(p => !p.id.startsWith("acc:"));
+      return [...acc, ...others];
+    }, [profiles]);
+  
+    // shuffle Fisher–Yates
+    function shuffle<T>(arr: T[]): T[] {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
     }
-    return a;
-  }
-
-  function toggle(id: string) {
-    setSelectedIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
-  }
-
-  function reshuffleSelected() {
-    setSelectedIds((ids) => shuffle(ids));
-  }
-
-  function onToggleRandomOrder(checked: boolean) {
-    setLocalRules((r) => ({ ...r, randomOrder: checked }));
-    if (checked) reshuffleSelected();
-  }
-
-  function start() {
-    const chosen = selectedIds
-      .map((id) => profiles.find((p) => p.id === id))
-      .filter(Boolean)
-      .map<Player>((p) => ({
-        id: uid(),
-        name: p!.name,
-        profileId: p!.id,
-        avatarDataUrl: p!.avatarDataUrl,
-        teamId: p!.teamId,
-        x01Score: localRules.startingScore,
-        legs: 0,
-        sets: 0,
-        dartsUsed: 0,
-        lastScore: 0,
-        points: 0,
-        lives: 3,
-        atcTarget: 1,
-      }));
-
-    if (chosen.length === 0) {
-      alert("Sélectionne au moins 1 joueur.");
-      return;
+  
+    function toggle(id: string) {
+      setSelectedIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
     }
-
-    const finalPlayers = localRules.randomOrder ? shuffle(chosen) : chosen;
-    onStart(finalPlayers, localRules);
-  }
-
-  return (
-    <section style={{ display: "grid", gap: 12 }}>
-      {/* Top bar */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <GlassButton onClick={onBack} leftIcon="folder">Retour</GlassButton>
-        <div style={{ opacity: 0.8 }}>Mode : <b>{mode}</b></div>
-      </div>
-
-      {/* Deux colonnes : Joueurs / Paramètres */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        {/* === Colonne Joueurs === */}
-        <div
-          style={{
-            border: "1px solid rgba(255,255,255,.08)",
-            background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
-            borderRadius: 12,
-            padding: 12,
-          }}
-        >
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>Joueurs</div>
-          <div style={{ display: "grid", gap: 6, maxHeight: 360, overflow: "auto", paddingRight: 4 }}>
-            {profiles.map((p) => {
-              const index = selectedIds.indexOf(p.id);
-              const is = index !== -1;
-              const isAcc = p.id.startsWith("acc:");
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => toggle(p.id)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    textAlign: "left",
-                    padding: 8,
-                    borderRadius: 10,
-                    border: "1px solid rgba(255,255,255,.08)",
-                    background: is
-                      ? "radial-gradient(120px 60px at 50% -20%, rgba(245,158,11,.35), rgba(245,158,11,.08))"
-                      : "#0e0e10",
-                    color: is ? "var(--c-primary)" : "#e7e7e7",
-                    fontWeight: is ? 800 : 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  {/* badge d'ordre */}
-                  <div
+  
+    function reshuffleSelected() {
+      setSelectedIds((ids) => shuffle(ids));
+    }
+  
+    function onToggleRandomOrder(checked: boolean) {
+      setLocalRules((r) => ({ ...r, randomOrder: checked }));
+      if (checked) reshuffleSelected();
+    }
+  
+    function start() {
+      const chosen = selectedIds
+        .map((id) => profiles.find((p) => p.id === id))
+        .filter(Boolean)
+        .map<Player>((p) => ({
+          id: uid(),
+          name: p!.name,
+          profileId: p!.id,
+          avatarDataUrl: p!.avatarDataUrl,
+          teamId: p!.teamId,
+          x01Score: localRules.startingScore,
+          legs: 0,
+          sets: 0,
+          dartsUsed: 0,
+          lastScore: 0,
+          points: 0,
+          lives: 3,
+          atcTarget: 1,
+        }));
+  
+      if (chosen.length === 0) {
+        alert("Sélectionne au moins 1 joueur.");
+        return;
+      }
+  
+      const finalPlayers = localRules.randomOrder ? shuffle(chosen) : chosen;
+      onStart(finalPlayers, localRules);
+    }
+  
+    return (
+      <section style={{ display: "grid", gap: 12 }}>
+        {/* Top bar */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <GlassButton onClick={onBack} leftIcon="folder">Retour</GlassButton>
+          <div style={{ opacity: 0.8 }}>Mode : <b>{mode}</b></div>
+        </div>
+  
+        {/* Deux colonnes : Joueurs / Paramètres */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {/* === Colonne Joueurs === */}
+          <div
+            style={{
+              border: "1px solid rgba(255,255,255,.08)",
+              background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
+              borderRadius: 12,
+              padding: 12,
+            }}
+          >
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>Joueurs</div>
+  
+            <div style={{ display: "grid", gap: 6, maxHeight: 360, overflow: "auto", paddingRight: 4 }}>
+              {sortedProfiles.map((p) => {
+                const index = selectedIds.indexOf(p.id);
+                const is = index !== -1;
+                const isAccount = p.id.startsWith("acc:");
+  
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => toggle(p.id)}
                     style={{
-                      width: 26,
-                      height: 26,
-                      borderRadius: 999,
-                      display: "grid",
-                      placeItems: "center",
-                      fontSize: 12,
-                      fontWeight: 900,
-                      background: is ? "var(--c-primary)" : "#222",
-                      color: is ? "#111" : "#aaa",
-                      border: "1px solid rgba(255,255,255,.12)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      textAlign: "left",
+                      padding: 8,
+                      borderRadius: 10,
+                      border: "1px solid rgba(255,255,255,.08)",
+                      background: is
+                        ? "radial-gradient(120px 60px at 50% -20%, rgba(245,158,11,.35), rgba(245,158,11,.08))"
+                        : "#0e0e10",
+                      color: is ? "var(--c-primary)" : "#e7e7e7",
+                      fontWeight: is ? 800 : 600,
+                      cursor: "pointer",
                     }}
-                    title={is ? `Ordre #${index + 1}` : "Non sélectionné"}
                   >
-                    {is ? index + 1 : "—"}
-                  </div>
-
-                  <Avatar name={p.name} src={p.avatarDataUrl} />
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {/* badge d'ordre */}
+                    <div
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: 999,
+                        display: "grid",
+                        placeItems: "center",
+                        fontSize: 12,
+                        fontWeight: 900,
+                        background: is ? "var(--c-primary)" : "#222",
+                        color: is ? "#111" : "#aaa",
+                        border: "1px solid rgba(255,255,255,.12)",
+                        flex: "0 0 auto",
+                      }}
+                      title={is ? `Ordre #${index + 1}` : "Non sélectionné"}
+                    >
+                      {is ? index + 1 : "—"}
+                    </div>
+  
+                    <Avatar name={p.name} src={p.avatarDataUrl} />
+  
+                    {/* Nom + sous-ligne (équipe) + badge COMPTE */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       <span>{p.name}</span>
-                      {isAcc && (
+  
+                      {isAccount && (
                         <span
                           style={{
                             fontSize: 11,
                             fontWeight: 900,
-                            color: "#111",
-                            background: "var(--c-primary)",
-                            border: "1px solid rgba(0,0,0,.25)",
+                            padding: "2px 8px",
                             borderRadius: 999,
-                            padding: "2px 6px",
+                            background:
+                              "linear-gradient(180deg, rgba(245,158,11,.25), rgba(245,158,11,.10))",
+                            border: "1px solid rgba(245,158,11,.45)",
+                            color: "var(--c-primary)",
+                            letterSpacing: 0.3,
+                            textTransform: "uppercase",
                           }}
+                          title="Profil issu de votre compte"
                         >
                           Compte
                         </span>
                       )}
+  
+                      <div style={{ width: "100%", fontSize: 12, opacity: 0.7 }}>
+                        {teams.find((t) => t.id === p.teamId)?.name || "(Aucune équipe)"}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 12, opacity: 0.7 }}>
-                      {teams.find((t) => t.id === p.teamId)?.name || "(Aucune équipe)"}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* === Colonne Paramètres === */}
-        <div
-          style={{
-            border: "1px solid rgba(255,255,255,.08)",
-            background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
-            borderRadius: 12,
-            padding: 12,
-          }}
-        >
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>Paramètres</div>
-
-          {mode === "X01" && (
-            <>
-              <div style={{ marginBottom: 6, opacity: 0.8 }}>Score de départ</div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-                {[301, 501, 701, 1001].map((s) => (
-                  <GlassButton
-                    key={s}
-                    onClick={() => setLocalRules({ ...localRules, startingScore: s })}
-                    active={localRules.startingScore === s}
-                  >
-                    {s}
-                  </GlassButton>
-                ))}
-              </div>
-              <label style={{ display: "flex", alignItems: "center", gap: 8, opacity: 0.9 }}>
-                <input
-                  type="checkbox"
-                  checked={localRules.doubleOut}
-                  onChange={(e) => setLocalRules({ ...localRules, doubleOut: e.target.checked })}
-                />
-                Sortie en double
-              </label>
-            </>
-          )}
-
-          {/* Legs / Sets */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 }}>
-            <div>
-              <div style={{ marginBottom: 4, opacity: 0.8 }}>Legs / set</div>
-              <input
-                type="number"
-                min={1}
-                value={localRules.legsToWinSet}
-                onChange={(e) =>
-                  setLocalRules({
-                    ...localRules,
-                    legsToWinSet: Math.max(1, Number(e.target.value) || 1),
-                  })
-                }
-                style={{
-                  width: "100%",
-                  padding: "8px 10px",
-                  borderRadius: 10,
-                  border: "1px solid #333",
-                  background: "#0f0f10",
-                  color: "#eee",
-                }}
-              />
-            </div>
-            <div>
-              <div style={{ marginBottom: 4, opacity: 0.8 }}>Sets / match</div>
-              <input
-                type="number"
-                min={1}
-                value={localRules.setsToWinMatch}
-                onChange={(e) =>
-                  setLocalRules({
-                    ...localRules,
-                    setsToWinMatch: Math.max(1, Number(e.target.value) || 1),
-                  })
-                }
-                style={{
-                  width: "100%",
-                  padding: "8px 10px",
-                  borderRadius: 10,
-                  border: "1px solid #333",
-                  background: "#0f0f10",
-                  color: "#eee",
-                }}
-              />
+                  </button>
+                );
+              })}
             </div>
           </div>
-
-          {/* ===== Ordre de jeu ===== */}
+  
+          {/* === Colonne Paramètres === */}
           <div
             style={{
-              marginTop: 12,
-              padding: 10,
-              borderRadius: 12,
               border: "1px solid rgba(255,255,255,.08)",
               background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
+              borderRadius: 12,
+              padding: 12,
             }}
           >
-            <div style={{ fontWeight: 700, marginBottom: 6 }}>Ordre de jeu</div>
-            <label style={{ display: "inline-flex", alignItems: "center", gap: 8, opacity: 0.9 }}>
-              <input
-                type="checkbox"
-                checked={!!localRules.randomOrder}
-                onChange={(e) => onToggleRandomOrder(e.target.checked)}
-              />
-              Tirage aléatoire au lancement
-            </label>
-
-            <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-              <GlassButton onClick={reshuffleSelected}>Mélanger maintenant</GlassButton>
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>Paramètres</div>
+  
+            {mode === "X01" && (
+              <>
+                <div style={{ marginBottom: 6, opacity: 0.8 }}>Score de départ</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                  {[301, 501, 701, 1001].map((s) => (
+                    <GlassButton
+                      key={s}
+                      onClick={() => setLocalRules({ ...localRules, startingScore: s })}
+                      active={localRules.startingScore === s}
+                    >
+                      {s}
+                    </GlassButton>
+                  ))}
+                </div>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, opacity: 0.9 }}>
+                  <input
+                    type="checkbox"
+                    checked={localRules.doubleOut}
+                    onChange={(e) => setLocalRules({ ...localRules, doubleOut: e.target.checked })}
+                  />
+                  Sortie en double
+                </label>
+              </>
+            )}
+  
+            {/* Legs / Sets */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 }}>
+              <div>
+                <div style={{ marginBottom: 4, opacity: 0.8 }}>Legs / set</div>
+                <input
+                  type="number"
+                  min={1}
+                  value={localRules.legsToWinSet}
+                  onChange={(e) =>
+                    setLocalRules({
+                      ...localRules,
+                      legsToWinSet: Math.max(1, Number(e.target.value) || 1),
+                    })
+                  }
+                  style={{
+                    width: "100%",
+                    padding: "8px 10px",
+                    borderRadius: 10,
+                    border: "1px solid #333",
+                    background: "#0f0f10",
+                    color: "#eee",
+                  }}
+                />
+              </div>
+              <div>
+                <div style={{ marginBottom: 4, opacity: 0.8 }}>Sets / match</div>
+                <input
+                  type="number"
+                  min={1}
+                  value={localRules.setsToWinMatch}
+                  onChange={(e) =>
+                    setLocalRules({
+                      ...localRules,
+                      setsToWinMatch: Math.max(1, Number(e.target.value) || 1),
+                    })
+                  }
+                  style={{
+                    width: "100%",
+                    padding: "8px 10px",
+                    borderRadius: 10,
+                    border: "1px solid #333",
+                    background: "#0f0f10",
+                    color: "#eee",
+                  }}
+                />
+              </div>
             </div>
-
-            <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
-              Astuce : l’ordre affiché (#1, #2, …) est celui utilisé au démarrage.
+  
+            {/* ===== Ordre de jeu ===== */}
+            <div
+              style={{
+                marginTop: 12,
+                padding: 10,
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,.08)",
+                background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>Ordre de jeu</div>
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 8, opacity: 0.9 }}>
+                <input
+                  type="checkbox"
+                  checked={!!localRules.randomOrder}
+                  onChange={(e) => onToggleRandomOrder(e.target.checked)}
+                />
+                Tirage aléatoire au lancement
+              </label>
+  
+              <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+                <GlassButton onClick={reshuffleSelected}>Mélanger maintenant</GlassButton>
+              </div>
+  
+              <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
+                Astuce : l’ordre affiché (#1, #2, …) est celui utilisé au démarrage.
+              </div>
             </div>
-          </div>
-
-          {/* Actions */}
-          <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-            <GlassButton onClick={start} leftIcon="dart">Lancer la partie</GlassButton>
-            <GlassButton onClick={onBack} leftIcon="folder">Annuler</GlassButton>
+  
+            {/* Actions */}
+            <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+              <GlassButton onClick={start} leftIcon="dart">Lancer la partie</GlassButton>
+              <GlassButton onClick={onBack} leftIcon="folder">Annuler</GlassButton>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
-  );
-} 
+      </section>
+    );
+  }   
 
 // ===== Mini-checkouts X01 (exemple) =====
 const MINI_CHECKOUTS: Record<number, string> = {
