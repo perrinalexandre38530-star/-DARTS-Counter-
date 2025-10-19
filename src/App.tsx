@@ -622,18 +622,21 @@ function Header({ onInstall }: { onInstall: () => void }) {
 }
 
 /* =========================================
-   Home (texte centré, sans logo)
+   Home (texte centré, sans logo + bouton Se connecter)
    ========================================= */
 function Home({
   onGoProfiles,
   onGoGames,
   onGoOnline = () => alert("Le jeu en ligne arrive bientôt 👀"),
   onGoStats,
+  // ✅ nouveau : callback login (par défaut → profils)
+  onGoLogin = onGoProfiles,
 }: {
   onGoProfiles: () => void;
   onGoGames: () => void;
   onGoOnline?: () => void;
   onGoStats: () => void;
+  onGoLogin?: () => void;
 }) {
   return (
     <section style={{ display: "grid", gap: 24 }}>
@@ -662,6 +665,26 @@ function Home({
           }}
         >
           DARTS COUNTER
+        </div>
+
+        {/* ✅ Bouton SE CONNECTER (au centre) */}
+        <div style={{ marginTop: 14 }}>
+          <button
+            onClick={onGoLogin}
+            style={{
+              padding: "10px 16px",
+              borderRadius: 12,
+              border: "1px solid rgba(245,158,11,.35)",
+              background:
+                "linear-gradient(180deg, rgba(245,158,11,.95), rgba(245,158,11,.75))",
+              color: "#111",
+              fontWeight: 900,
+              letterSpacing: 0.3,
+              cursor: "pointer",
+            }}
+          >
+            SE CONNECTER
+          </button>
         </div>
       </div>
 
@@ -712,6 +735,7 @@ function Home({
     </section>
   );
 }
+
   
   /* === STYLES COMMUNS === */
   const buttonStyle: React.CSSProperties = {
