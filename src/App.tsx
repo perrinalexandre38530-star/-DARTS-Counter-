@@ -1205,213 +1205,249 @@ function GamesHub({
 }
 
 /* =========================================
-   ProfilesPage (minimal, compile)
+   ProfilesPage (avec bloc "Votre compte")
    ========================================= */
-function ProfilesPage({
-  profiles,
-  setProfiles,
-  teams,
-  setTeams,
-  events,
-}: {
-  profiles: Profile[];
-  setProfiles: (u: any) => void;
-  teams: Team[];
-  setTeams: (u: any) => void;
-  events: GameEvent[];
-}) {
-  const [selectedId, setSelectedId] = useState<string>(() => profiles[0]?.id || "");
-  const selected = useMemo(() => profiles.find((p) => p.id === selectedId), [profiles, selectedId]);
-
-  const [newName, setNewName] = useState("");
-
-  async function uploadAvatar(f?: File) {
-    if (!selected || !f) return;
-    const url = await fileToDataURL(f);
-    setProfiles((arr: Profile[]) => arr.map((p) => (p.id === selected.id ? { ...p, avatarDataUrl: url } : p)));
-  }
-
-  function addProfile() {
-    const name = newName.trim() || `Joueur ${profiles.length + 1}`;
-    const p: Profile = { id: uid(), name, stats: { games: 0, legs: 0, darts: 0, sets: 0 } };
-    setProfiles((arr: Profile[]) => [...arr, p]);
-    setNewName("");
-    setSelectedId(p.id);
-  }
-
-  return (
-    <section style={{ display: "grid", gap: 12 }}>
-      <div className="hide-sm">
-        <SectionTabs
-          tabs={[
-            { key: "list", label: "Profils", icon: "user" },
-            { key: "stats", label: "Stats (bêta)", icon: "chart" },
-          ]}
-          value={"list"}
-          onChange={() => {}}
-        />
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 12 }}>
-        <div
-          style={{
-            border: "1px solid rgba(255,255,255,.08)",
-            background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
-            borderRadius: 12,
-            padding: 10,
-          }}
-        >
-          <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
-  <input
-    value={newName}
-    onChange={(e) => setNewName(e.target.value)}
-    placeholder="Nom du profil"
-    style={{
-      flex: 1,
-      padding: "8px 10px",
-      borderRadius: 10,
-      border: "1px solid #333",
-      background: "#0f0f10",
-      color: "#eee",
-      fontSize: 14,
-    }}
-  />
-
-  <button
-    onClick={addProfile}
-    aria-label="Ajouter un joueur"
-    title="Ajouter un joueur"
-    onMouseEnter={(e) => (e.currentTarget.style.filter = "brightness(1.1)")}
-    onMouseLeave={(e) => (e.currentTarget.style.filter = "none")}
-    style={{
-      width: 32,
-      height: 32,
-      minWidth: 32,
-      minHeight: 32,
-      borderRadius: 9999,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      background: "var(--c-primary)",
-      color: "#111",
-      border: "1px solid rgba(0,0,0,.25)",
-      boxShadow: "0 6px 14px rgba(0,0,0,.35)",
-      lineHeight: 1,
-      padding: 0,
-      cursor: "pointer",
-      fontWeight: 800,
-    }}
-  >
-    <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-      {/* Silhouette de joueur */}
-      <svg
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        aria-hidden="true"
-        style={{ opacity: 0.9 }}
-      >
-        <path d="M12 12c2.761 0 5-2.686 5-6s-2.239-6-5-6-5 2.686-5 6 2.239 6 5 6zm0 2c-4.418 0-8 2.239-8 5v3h16v-3c0-2.761-3.582-5-8-5z"/>
-      </svg>
-      <span>+</span>
-    </span>
-  </button>
-          </div>
-          <div style={{ display: "grid", gap: 6, maxHeight: 380, overflow: "auto", paddingRight: 4 }}>
-            {profiles.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setSelectedId(p.id)}
+   function ProfilesPage({
+    profiles, setProfiles, teams, setTeams, events,
+    account, loggedIn,
+  }: {
+    profiles: Profile[];
+    setProfiles: (u: any) => void;
+    teams: Team[];
+    setTeams: (u: any) => void;
+    events: GameEvent[];
+    account?: Account | null;
+    loggedIn: boolean;
+  }) {
+  
+    const [selectedId, setSelectedId] = useState<string>(() => profiles[0]?.id || "");
+    const selected = useMemo(() => profiles.find((p) => p.id === selectedId), [profiles, selectedId]);
+  
+    const [newName, setNewName] = useState("");
+  
+    async function uploadAvatar(f?: File) {
+      if (!selected || !f) return;
+      const url = await fileToDataURL(f);
+      setProfiles((arr: Profile[]) =>
+        arr.map((p) => (p.id === selected.id ? { ...p, avatarDataUrl: url } : p))
+      );
+    }
+  
+    function addProfile() {
+      const name = newName.trim() || `Joueur ${profiles.length + 1}`;
+      const p: Profile = { id: uid(), name, stats: { games: 0, legs: 0, darts: 0, sets: 0 } };
+      setProfiles((arr: Profile[]) => [...arr, p]);
+      setNewName("");
+      setSelectedId(p.id);
+    }
+  
+    return (
+      <section style={{ display: "grid", gap: 12 }}>
+        <div className="hide-sm">
+          <SectionTabs
+            tabs={[
+              { key: "list", label: "Profils", icon: "user" },
+              { key: "stats", label: "Stats (bêta)", icon: "chart" },
+            ]}
+            value={"list"}
+            onChange={() => {}}
+          />
+        </div>
+  
+        <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 12 }}>
+          {/* ========= Colonne gauche : création + liste ========= */}
+          <div
+            style={{
+              border: "1px solid rgba(255,255,255,.08)",
+              background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
+              borderRadius: 12,
+              padding: 10,
+            }}
+          >
+            {/* ✅ Bloc “Votre compte” si connecté */}
+            {loggedIn && account && (
+              <div
                 style={{
-                  textAlign: "left",
+                  border: "1px solid rgba(255,255,255,.12)",
+                  background:
+                    "linear-gradient(180deg, rgba(245,158,11,.12), rgba(10,10,12,.55))",
+                  borderRadius: 12,
+                  padding: 10,
+                  marginBottom: 10,
                   display: "flex",
                   alignItems: "center",
-                  gap: 8,
-                  padding: 8,
-                  borderRadius: 10,
-                  border: "1px solid rgba(255,255,255,.08)",
-                  background:
-                    selectedId === p.id
-                      ? "radial-gradient(120px 60px at 50% -20%, rgba(245,158,11,.35), rgba(245,158,11,.08))"
-                      : "#0e0e10",
-                  color: selectedId === p.id ? "var(--c-primary)" : "#e7e7e7",
-                  fontWeight: selectedId === p.id ? 800 : 600,
+                  gap: 10,
                 }}
               >
-                <Avatar name={p.name} src={p.avatarDataUrl} />
-                <div>
-                  <div>{p.name}</div>
-                  <div style={{ fontSize: 12, opacity: 0.7 }}>
-                    {p.stats?.games ?? 0} parties · {p.stats?.legs ?? 0} legs · {p.stats?.darts ?? 0} darts
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div
-          style={{
-            border: "1px solid rgba(255,255,255,.08)",
-            background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
-            borderRadius: 12,
-            padding: 12,
-          }}
-        >
-          {!selected ? (
-            <div style={{ opacity: 0.7 }}>Sélectionne un profil.</div>
-          ) : (
-            <>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                <Avatar name={selected.name} src={selected.avatarDataUrl} size={100} />
-                <input
-                  value={selected.name}
-                  onChange={(e) =>
-                    setProfiles((arr: Profile[]) =>
-                      arr.map((p) => (p.id === selected.id ? { ...p, name: e.target.value } : p))
-                    )
-                  }
-                  style={{
-                    flex: 1,
-                    padding: "8px 10px",
-                    borderRadius: 10,
-                    border: "1px solid #333",
-                    background: "#0f0f10",
-                    color: "#eee",
-                  }}
+                <Avatar
+                  name={account.name}
+                  // si tu as bien ajouté `avatarDataUrl?: string` dans Account
+                  src={(account as any).avatarDataUrl}
+                  size={48}
                 />
-                <label
+                <div style={{ display: "grid" }}>
+                  <div style={{ fontWeight: 900, color: "var(--c-primary)" }}>
+                    Votre compte
+                  </div>
+                  <div style={{ opacity: 0.85 }}>{account.name}</div>
+                </div>
+              </div>
+            )}
+  
+            {/* Création rapide d’un profil local */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Nom du profil"
+                style={{
+                  flex: 1,
+                  padding: "8px 10px",
+                  borderRadius: 10,
+                  border: "1px solid #333",
+                  background: "#0f0f10",
+                  color: "#eee",
+                  fontSize: 14,
+                }}
+              />
+              <button
+                onClick={addProfile}
+                aria-label="Ajouter un joueur"
+                title="Ajouter un joueur"
+                onMouseEnter={(e) => (e.currentTarget.style.filter = "brightness(1.1)")}
+                onMouseLeave={(e) => (e.currentTarget.style.filter = "none")}
+                style={{
+                  width: 32,
+                  height: 32,
+                  minWidth: 32,
+                  minHeight: 32,
+                  borderRadius: 9999,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "var(--c-primary)",
+                  color: "#111",
+                  border: "1px solid rgba(0,0,0,.25)",
+                  boxShadow: "0 6px 14px rgba(0,0,0,.35)",
+                  lineHeight: 1,
+                  padding: 0,
+                  cursor: "pointer",
+                  fontWeight: 800,
+                }}
+              >
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    aria-hidden="true"
+                    style={{ opacity: 0.9 }}
+                  >
+                    <path d="M12 12c2.761 0 5-2.686 5-6s-2.239-6-5-6-5 2.686-5 6 2.239 6 5 6zm0 2c-4.418 0-8 2.239-8 5v3h16v-3c0-2.761-3.582-5-8-5z" />
+                  </svg>
+                  <span>+</span>
+                </span>
+              </button>
+            </div>
+  
+            {/* Liste des profils locaux */}
+            <div style={{ display: "grid", gap: 6, maxHeight: 380, overflow: "auto", paddingRight: 4 }}>
+              {profiles.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setSelectedId(p.id)}
                   style={{
-                    padding: "8px 10px",
+                    textAlign: "left",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: 8,
                     borderRadius: 10,
                     border: "1px solid rgba(255,255,255,.08)",
-                    background: "#111",
+                    background:
+                      selectedId === p.id
+                        ? "radial-gradient(120px 60px at 50% -20%, rgba(245,158,11,.35), rgba(245,158,11,.08))"
+                        : "#0e0e10",
+                    color: selectedId === p.id ? "var(--c-primary)" : "#e7e7e7",
+                    fontWeight: selectedId === p.id ? 800 : 600,
                     cursor: "pointer",
                   }}
                 >
-                  Changer avatar
+                  <Avatar name={p.name} src={p.avatarDataUrl} />
+                  <div>
+                    <div>{p.name}</div>
+                    <div style={{ fontSize: 12, opacity: 0.7 }}>
+                      {p.stats?.games ?? 0} parties · {p.stats?.legs ?? 0} legs · {p.stats?.darts ?? 0} darts
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+  
+          {/* ========= Colonne droite : fiche du profil sélectionné ========= */}
+          <div
+            style={{
+              border: "1px solid rgba(255,255,255,.08)",
+              background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
+              borderRadius: 12,
+              padding: 12,
+            }}
+          >
+            {!selected ? (
+              <div style={{ opacity: 0.7 }}>Sélectionne un profil.</div>
+            ) : (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                  <Avatar name={selected.name} src={selected.avatarDataUrl} size={100} />
                   <input
-                    type="file"
-                    accept="image/*"
-                    className="hide-lg"
-                    onChange={(e) => uploadAvatar(e.target.files?.[0])}
+                    value={selected.name}
+                    onChange={(e) =>
+                      setProfiles((arr: Profile[]) =>
+                        arr.map((p) => (p.id === selected.id ? { ...p, name: e.target.value } : p))
+                      )
+                    }
+                    style={{
+                      flex: 1,
+                      padding: "8px 10px",
+                      borderRadius: 10,
+                      border: "1px solid #333",
+                      background: "#0f0f10",
+                      color: "#eee",
+                    }}
                   />
-                </label>
-              </div>
-
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>Aperçu des stats (volées)</div>
-              <div style={{ fontSize: 14, opacity: 0.85 }}>
-                Volées enregistrées pour ce profil :{" "}
-                {events.filter((ev) => ev.profileId === selected.id).length}
-              </div>
-            </>
-          )}
+                  <label
+                    style={{
+                      padding: "8px 10px",
+                      borderRadius: 10,
+                      border: "1px solid rgba(255,255,255,.08)",
+                      background: "#111",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Changer avatar
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hide-lg"
+                      onChange={(e) => uploadAvatar(e.target.files?.[0])}
+                    />
+                  </label>
+                </div>
+  
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>Aperçu des stats (volées)</div>
+                <div style={{ fontSize: 14, opacity: 0.85 }}>
+                  Volées enregistrées pour ce profil :{" "}
+                  {events.filter((ev) => ev.profileId === selected.id).length}
+                </div>
+              </>
+            )}
+          </div>
         </div>
-      </div>
-    </section>
-  );
-}
+      </section>
+    );
+  }  
 
 /* =========================================
    LobbyPage (avec ordre, mélange, badges)
