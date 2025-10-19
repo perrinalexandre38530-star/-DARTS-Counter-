@@ -1519,23 +1519,18 @@ function GamesHub({
 }
 
 /* =========================================
-   ProfilesPage — compte affiché en haut, masqué dans la liste
+   ProfilesPage — colonne unique (compte + amis + création + liste)
    ========================================= */
    function ProfilesPage({
-    profiles, setProfiles, teams, setTeams, events,
-    account, loggedIn,
-    onOpenAccount,
+    profiles, setProfiles, account, loggedIn, onOpenAccount,
   }: {
     profiles: Profile[];
     setProfiles: (updater: any) => void;
-    teams: Team[];
-    setTeams: (updater: any) => void;
-    events: GameEvent[];
     account?: Account | null;
     loggedIn: boolean;
     onOpenAccount?: () => void;
   }) {
-    // 1) Sync du compte vers un profil "acc:..."
+    // --- Synchroniser le compte connecté dans la liste (id = acc:...) ---
     useEffect(() => {
       if (!loggedIn || !account) return;
       const pid = `acc:${account.id}`;
@@ -1545,62 +1540,66 @@ function GamesHub({
           id: pid,
           name: account.name,
           avatarDataUrl: account.avatarDataUrl,
-          stats: arr.find(p => p.id === pid)?.stats ?? { games: 0, legs: 0, sets: 0, darts: 0 },
+          stats: arr.find(p => p.id === pid)?.stats ?? { games: 0, legs: 0, darts: 0, sets: 0 },
         };
         return exists ? arr.map(p => (p.id === pid ? next : p)) : [...arr, next];
       });
     }, [loggedIn, account?.id, account?.name, account?.avatarDataUrl, setProfiles]);
   
-    // 2) Liste SANS le profil-compte
-    const displayProfiles = React.useMemo(
+    // --- Liste sans le profil-compte ---
+    const displayProfiles = useMemo(
       () => profiles.filter(p => !p.id.startsWith("acc:")),
       [profiles]
     );
   
-    // 3) Sélection par défaut = 1er profil NON-compte
-    const [selectedId, setSelectedId] = React.useState<string>(() => displayProfiles[0]?.id || "");
-    React.useEffect(() => {
-      if (!selectedId || !displayProfiles.some(p => p.id === selectedId)) {
-        setSelectedId(displayProfiles[0]?.id || "");
-      }
-    }, [displayProfiles, selectedId]);
+    // --- Création d’un nouveau profil ---
+    const [newName, setNewName] = useState("");
+    const [newAvatar, setNewAvatar] = useState<string | undefined>();
   
-    const selected = React.useMemo(
-      () => displayProfiles.find((p) => p.id === selectedId),
-      [displayProfiles, selectedId]
-    );
-  
-    const [newName, setNewName] = React.useState("");
-  
-    async function uploadAvatar(f?: File) {
-      if (!selected || !f) return;
+    async function onPickNewAvatar(f?: File) {
+      if (!f) return;
       const url = await fileToDataURL(f);
-      setProfiles((arr: Profile[]) =>
-        arr.map((p) => (p.id === selected.id ? { ...p, avatarDataUrl: url } : p))
-      );
+      setNewAvatar(url);
     }
   
     function addProfile() {
       const name = newName.trim() || `Joueur ${profiles.length + 1}`;
-      const p: Profile = { id: uid(), name, stats: { games: 0, legs: 0, darts: 0, sets: 0 } };
+      const p: Profile = {
+        id: uid(),
+        name,
+        avatarDataUrl: newAvatar,
+        stats: { games: 0, legs: 0, darts: 0, sets: 0 },
+      };
       setProfiles((arr: Profile[]) => [...arr, p]);
       setNewName("");
-      setSelectedId(p.id);
+      setNewAvatar(undefined);
     }
   
+    // --- Liste déroulante : sélection simple ---
+    const [selectedId, setSelectedId] = useState<string>("");
+  
+    // --- Bloc Amis (lecture depuis localStorage, optionnel) ---
+    type MiniFriend = { id: string; name: string; online?: boolean };
+    const friendsList: MiniFriend[] = useMemo(() => {
+      try {
+        const raw = localStorage.getItem("dc.friends");
+        return raw ? (JSON.parse(raw) as MiniFriend[]) : [];
+      } catch {
+        return [];
+      }
+    }, []);
+    const onlineCount = friendsList.filter(f => f.online).length;
+  
     return (
-      <section style={{ display: "grid", gap: 12 }}>
-        {/* === Bloc "Votre compte" conservé en haut === */}
+      <section style={{ display: "grid", gap: 12, maxWidth: 360 }}>
+        {/* --- Votre compte --- */}
         {loggedIn && account && (
           <button
             onClick={onOpenAccount}
-            title="Ouvrir la page Compte"
             style={{
-              width: 280,
               textAlign: "left",
               border: "1px solid rgba(255,255,255,.12)",
-              background:
-                "linear-gradient(180deg, rgba(245,158,11,.12), rgba(10,10,12,.55))",
+              background: "linear-gradient(180deg, rgba(245,158,11,.12), rgba(10,10,12,.55))",
               borderRadius: 12,
               padding: 10,
               display: "flex",
@@ -1617,151 +1616,200 @@ function GamesHub({
           </button>
         )}
   
-        <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 12 }}>
-          {/* Colonne gauche : création + liste (sans le compte) */}
+        {/* --- Amis en ligne --- */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            border: "1px solid rgba(255,255,255,.08)",
+            background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
+            borderRadius: 12,
+            padding: 10,
+          }}
+        >
           <div
             style={{
-              border: "1px solid rgba(255,255,255,.08)",
-              background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
-              borderRadius: 12,
-              padding: 10,
+              width: 40, height: 40, borderRadius: 999,
+              display: "grid", placeItems: "center",
+              border: "1px solid rgba(34,197,94,.35)",
+              background: "rgba(34,197,94,.12)",
+              color: "#34d399", fontWeight: 900,
             }}
           >
-            {/* Création rapide */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
-              <input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="Nom du profil"
-                style={{
-                  flex: 1,
-                  padding: "8px 10px",
-                  borderRadius: 10,
-                  border: "1px solid #333",
-                  background: "#0f0f10",
-                  color: "#eee",
-                  fontSize: 14,
-                }}
-              />
-              <button
-                onClick={addProfile}
-                title="Ajouter un joueur"
-                style={{
-                  width: 32, height: 32, minWidth: 32, minHeight: 32,
-                  borderRadius: 9999, display: "flex", alignItems: "center", justifyContent: "center",
-                  background: "var(--c-primary)", color: "#111",
-                  border: "1px solid rgba(0,0,0,.25)", boxShadow: "0 6px 14px rgba(0,0,0,.35)",
-                  fontWeight: 800, cursor: "pointer",
-                }}
-              >
-                +
-              </button>
-            </div>
-  
-            {/* Liste SANS le profil-compte */}
-            <div style={{ display: "grid", gap: 6, maxHeight: 380, overflow: "auto", paddingRight: 4 }}>
-              {displayProfiles.length === 0 && (
-                <div style={{ opacity: .7, padding: 8 }}>
-                  Aucun profil local. Crée un profil ou utilise ton compte.
-                </div>
-              )}
-  
-              {displayProfiles.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setSelectedId(p.id)}
-                  style={{
-                    textAlign: "left",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: 8,
-                    borderRadius: 10,
-                    border: "1px solid rgba(255,255,255,.08)",
-                    background:
-                      selectedId === p.id
-                        ? "radial-gradient(120px 60px at 50% -20%, rgba(245,158,11,.35), rgba(245,158,11,.08))"
-                        : "#0e0e10",
-                    color: selectedId === p.id ? "var(--c-primary)" : "#e7e7e7",
-                    fontWeight: selectedId === p.id ? 800 : 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  <Avatar name={p.name} src={p.avatarDataUrl} />
-                  <div>
-                    <div>{p.name}</div>
-                    <div style={{ fontSize: 12, opacity: 0.7 }}>
-                      {p.stats?.games ?? 0} parties · {p.stats?.legs ?? 0} legs · {p.stats?.darts ?? 0} darts
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
+            🟢
           </div>
-  
-          {/* Colonne droite : fiche du profil sélectionné */}
-          <div
-            style={{
-              border: "1px solid rgba(255,255,255,.08)",
-              background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
-              borderRadius: 12,
-              padding: 12,
-            }}
-          >
-            {!selected ? (
-              <div style={{ opacity: 0.7 }}>Sélectionne un profil (ou crée-en un).</div>
+          <div style={{ lineHeight: 1.2 }}>
+            <div style={{ fontWeight: 800, color: "#34d399" }}>Amis en ligne</div>
+            {loggedIn ? (
+              <div style={{ fontSize: 13, opacity: .85 }}>
+                {onlineCount} en ligne · {friendsList.length} total
+              </div>
             ) : (
-              <>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                  <Avatar name={selected.name} src={selected.avatarDataUrl} size={100} />
-                  <input
-                    value={selected.name}
-                    onChange={(e) =>
-                      setProfiles((arr: Profile[]) =>
-                        arr.map((p) => (p.id === selected.id ? { ...p, name: e.target.value } : p))
-                      )
-                    }
+              <div style={{ fontSize: 13, opacity: .7 }}>Connecte-toi pour voir tes amis.</div>
+            )}
+          </div>
+        </div>
+  
+        {/* --- Encadré fusionné : Créer un profil + Liste déroulante + Liste complète --- */}
+        <div
+          style={{
+            border: "1px solid rgba(255,255,255,.08)",
+            background: "linear-gradient(180deg, rgba(20,20,24,.45), rgba(10,10,12,.55))",
+            borderRadius: 12,
+            padding: 12,
+            display: "grid",
+            gap: 12,
+          }}
+        >
+          {/* Créer un profil */}
+          <div>
+            <div style={{ fontWeight: 800, marginBottom: 8 }}>Créer un profil</div>
+            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+              {/* Avatar preview agrandi */}
+              <div style={{ display: "grid", placeItems: "center" }}>
+                {newAvatar ? (
+                  <img
+                    src={newAvatar}
+                    alt="avatar"
+                    style={{
+                      width: 90, height: 90, borderRadius: "50%",
+                      objectFit: "cover", border: "1px solid #333",
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: 90, height: 90, borderRadius: "50%",
+                      display: "grid", placeItems: "center",
+                      background: "#0f0f10", color: "#777", fontWeight: 800,
+                      border: "1px solid #333",
+                      fontSize: 28,
+                    }}
+                  >
+                    +
+                  </div>
+                )}
+              </div>
+  
+              <div style={{ flex: 1 }}>
+                <input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Nom du profil"
+                  style={{
+                    width: "100%",
+                    padding: "8px 10px",
+                    borderRadius: 10,
+                    border: "1px solid #333",
+                    background: "#0f0f10",
+                    color: "#eee",
+                    fontSize: 14,
+                    marginBottom: 6,
+                  }}
+                />
+                <div style={{ display: "flex", gap: 6 }}>
+                  <label
                     style={{
                       flex: 1,
                       padding: "8px 10px",
                       borderRadius: 10,
-                      border: "1px solid #333",
-                      background: "#0f0f10",
-                      color: "#eee",
-                    }}
-                  />
-                  <label
-                    style={{
-                      padding: "8px 10px",
-                      borderRadius: 10,
                       border: "1px solid rgba(255,255,255,.08)",
                       background: "#111",
+                      color: "#eee",
                       cursor: "pointer",
+                      textAlign: "center",
+                      fontWeight: 700,
                     }}
                   >
-                    Changer avatar
+                    Choisir avatar
                     <input
                       type="file"
                       accept="image/*"
-                      className="hide-lg"
-                      onChange={(e) => uploadAvatar(e.target.files?.[0])}
+                      style={{ display: "none" }}
+                      onChange={(e) => onPickNewAvatar(e.target.files?.[0])}
                     />
                   </label>
+                  <button
+                    onClick={addProfile}
+                    style={{
+                      flex: 1,
+                      borderRadius: 10,
+                      background: "var(--c-primary)",
+                      border: "none",
+                      color: "#111",
+                      fontWeight: 900,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Ajouter
+                  </button>
                 </div>
+              </div>
+            </div>
+          </div>
   
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>Aperçu des stats (volées)</div>
-                <div style={{ fontSize: 14, opacity: 0.85 }}>
-                  Volées enregistrées pour ce profil :{" "}
-                  {events.filter((ev) => ev.profileId === selected.id).length}
-                </div>
-              </>
+          {/* Liste déroulante des profils */}
+          <div>
+            <label style={{ fontWeight: 700, fontSize: 13, opacity: 0.8 }}>Profils locaux</label>
+            <select
+              value={selectedId || ""}
+              onChange={(e) => setSelectedId(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "8px 10px",
+                borderRadius: 10,
+                border: "1px solid #333",
+                background: "#0f0f10",
+                color: "#eee",
+                marginTop: 4,
+              }}
+            >
+              {displayProfiles.length === 0 ? (
+                <option value="" disabled>Aucun profil local</option>
+              ) : (
+                displayProfiles.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))
+              )}
+            </select>
+          </div>
+  
+          {/* Liste complète dessous */}
+          <div style={{ display: "grid", gap: 6, maxHeight: 350, overflow: "auto", paddingRight: 4 }}>
+            {displayProfiles.length === 0 && (
+              <div style={{ opacity: .7, padding: 8 }}>Aucun profil local.</div>
             )}
+            {displayProfiles.map((p) => (
+              <div
+                key={p.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: 8,
+                  borderRadius: 10,
+                  border: "1px solid rgba(255,255,255,.08)",
+                  background: "#0e0e10",
+                  color: "#e7e7e7",
+                  fontWeight: 600,
+                }}
+              >
+                <Avatar name={p.name} src={p.avatarDataUrl} />
+                <div>
+                  <div>{p.name}</div>
+                  <div style={{ fontSize: 12, opacity: 0.7 }}>
+                    {p.stats?.games ?? 0} parties · {p.stats?.legs ?? 0} legs · {p.stats?.darts ?? 0} darts
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
     );
-  }    
-
+  }  
+  
 /* =========================================
    LobbyPage (profil-compte en tête + badge "COMPTE")
    ========================================= */
@@ -2591,70 +2639,61 @@ function BackArrowButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-/* ========= X01Keypad (3 fléchettes, auto-avance, BULL, retour ← néon) ========= */
+/* ========= X01Keypad (attente validation, BULL vert, Total doré) ========= */
 function X01Keypad({
   onSubmit,
   onCancel,
   onDart,
-  label = "Valider la volée",
-  onPreview, // <-- nouveau : pour afficher les 3 carrés néon dans le profil actif
+  label = "Valider",
+  onPreview,
 }: {
   onSubmit: (darts: Dart[]) => void;
   onCancel?: () => void;
   label?: string;
   onPreview?: (slots: Array<Dart | null>) => void;
 }) {
-  const [darts, setDarts] = React.useState<Array<Dart | null>>([null, null, null]); // 3 fléchettes
-  const [active, setActive] = React.useState<number>(0);          // 0..2
-  const [multNext, setMultNext] = React.useState<1 | 2 | 3>(1);   // multiplicateur à appliquer au prochain appui (S par défaut)
+  const [darts, setDarts] = React.useState<Array<Dart | null>>([null, null, null]);
+  const [active, setActive] = React.useState<number>(0);
+  const [multNext, setMultNext] = React.useState<1 | 2 | 3>(1);
 
-  // total pour affichage local (si tu veux l'utiliser)
   const total = React.useMemo(() => {
     const filled = darts.map((d) => d ?? { mult: 1, val: 0 });
-    return filled.reduce((s, d) => (d.val === 25 ? s + (d.mult === 2 ? 50 : 25) : s + d.val * d.mult), 0);
+    return filled.reduce(
+      (s, d) => (d.val === 25 ? s + (d.mult === 2 ? 50 : 25) : s + d.val * d.mult),
+      0
+    );
   }, [darts]);
 
-  // Place un nombre (0..20 ou 25=BULL) sur la fléchette active, avance, et soumet si 3e
   function putNumber(n: number) {
     const current = { mult: multNext, val: n } as Dart;
-  
-    // met à jour localement
+
+    // MAJ locale
     const copyAfter = [...darts];
     copyAfter[active] = current;
     setDarts(copyAfter);
-  
-    // informe GamePage -> met à jour turnDarts pour <NeonDartBoxes/>
-    onDart?.(current, active);
-  
-    // prochaine fléchette en "Simple" par défaut
-    setMultNext(1);
-  
-    // si 3e fléchette: soumettre immédiatement, sinon passer à la suivante
-    if (active === 2) {
-      onSubmit(copyAfter as Dart[]);
-      // reset pour le tour suivant
-      setDarts([null, null, null]);
-      setActive(0);
-      setMultNext(1);
-    } else {
-      setActive(active + 1);
-    }
-  }  
 
-  // Efface la dernière fléchette saisie et revient dessus
+    // preview (3 carrés néon côté profil actif)
+    onDart?.(current, active);
+    onPreview?.(copyAfter);
+
+    // retour en "Simple" par défaut
+    setMultNext(1);
+
+    // 👉 pas d'auto-submit : on avance jusqu’à la 3e et on y reste
+    setActive((i) => Math.min(2, i + 1));
+  }
+
   function backspace() {
     const last = [2, 1, 0].find((i) => darts[i] !== null) ?? 0;
     const copy = [...darts];
     copy[last] = null;
     setDarts(copy);
-  
-    // préviens GamePage qu'on efface cette fléchette
     onDart?.(null, last);
-  
+    onPreview?.(copy);
     setActive(last);
-  }  
+    setMultNext(1);
+  }
 
-  // Soumission manuelle (rarement utile car on soumet auto à la 3e)
   function submitManuel() {
     const payload = darts.map((d) => d ?? ({ mult: 1, val: 0 } as Dart)) as Dart[];
     onSubmit(payload);
@@ -2665,7 +2704,7 @@ function X01Keypad({
     setMultNext(1);
   }
 
-  // styles utilitaires locale pour éviter les collisions
+  // —— styles —— //
   const btnBase: React.CSSProperties = {
     padding: "10px 0",
     borderRadius: 12,
@@ -2673,23 +2712,24 @@ function X01Keypad({
     background: "#151515",
     color: "#ddd",
     cursor: "pointer",
+    fontWeight: 700,
   };
 
-  const neonBlue = (active: boolean): React.CSSProperties => ({
+  const neonBlue = (isOn: boolean): React.CSSProperties => ({
     padding: "10px 0",
     borderRadius: 12,
     border: "1px solid #1f3a45",
-    background: active ? "#0c2530" : "#102228",
+    background: isOn ? "#0c2530" : "#102228",
     color: "#aee3ff",
     fontWeight: 800,
     cursor: "pointer",
   });
 
-  const neonPink = (active: boolean): React.CSSProperties => ({
+  const neonPink = (isOn: boolean): React.CSSProperties => ({
     padding: "10px 0",
     borderRadius: 12,
     border: "1px solid #3a1f45",
-    background: active ? "#2a0c30" : "#281022",
+    background: isOn ? "#2a0c30" : "#281022",
     color: "#ffb3e1",
     fontWeight: 800,
     cursor: "pointer",
@@ -2699,7 +2739,8 @@ function X01Keypad({
     padding: "10px 0",
     borderRadius: 12,
     border: "1px solid rgba(245,158,11,.35)",
-    background: "radial-gradient(100px 50px at 50% -20%, rgba(245,158,11,.25), rgba(245,158,11,.06))",
+    background:
+      "radial-gradient(100px 50px at 50% -20%, rgba(245,158,11,.25), rgba(245,158,11,.06))",
     color: "#fbbf24",
     fontWeight: 900,
     cursor: "pointer",
@@ -2709,9 +2750,43 @@ function X01Keypad({
     transition: "transform 0.15s ease",
   };
 
+  // BULL vert stylé & gras
+  const neonGreen: React.CSSProperties = {
+    padding: "10px 0",
+    borderRadius: 12,
+    border: "1px solid rgba(16,185,129,.45)",           // #10b981 ~ emerald
+    background:
+      "radial-gradient(120px 60px at 50% -20%, rgba(16,185,129,.25), rgba(16,185,129,.08))",
+    color: "#34d399",                                    // emerald-400
+    fontWeight: 900,
+    letterSpacing: 0.3,
+    cursor: "pointer",
+    textShadow: "0 0 10px rgba(16,185,129,.35)",
+  };
+
+  const totalBox: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "8px 12px",
+    borderRadius: 12,
+    background: "rgba(255,255,255,.03)",
+    border: "1px solid rgba(255,255,255,.06)",
+  };
+
+  const totalValue: React.CSSProperties = {
+    fontWeight: 900,
+    fontSize: 22,
+    lineHeight: 1,
+    color: "#fbbf24", // même doré que le score en haut
+    letterSpacing: 0.5,
+    textShadow: "0 0 12px rgba(251,191,36,.35)",
+    marginLeft: 6,
+  };
+
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      {/* Flèche active 1/2/3 (indicateur) */}
+      {/* Sélecteurs Flèche 1/2/3 */}
       <div style={{ display: "flex", gap: 8 }}>
         {[0, 1, 2].map((i) => (
           <button
@@ -2722,10 +2797,11 @@ function X01Keypad({
               padding: "8px 0",
               borderRadius: 12,
               border: "1px solid rgba(255,255,255,.08)",
-              background: active === i
-                ? "radial-gradient(120px 60px at 50% -20%, rgba(245,158,11,.28), rgba(245,158,11,.07))"
-                : "#111",
-              color: active === i ? "var(--c-primary)" : "#ddd",
+              background:
+                active === i
+                  ? "radial-gradient(120px 60px at 50% -20%, rgba(245,158,11,.28), rgba(245,158,11,.07))"
+                  : "#111",
+              color: active === i ? "#fbbf24" : "#ddd",
               fontWeight: 800,
               cursor: "pointer",
             }}
@@ -2735,12 +2811,11 @@ function X01Keypad({
         ))}
       </div>
 
-      {/* DOUBLE / TRIPLE / ← Retour (harmonisés néon) */}
+      {/* DOUBLE / TRIPLE / ← Retour */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
         <button onClick={() => setMultNext(2)} style={neonBlue(multNext === 2)}>DOUBLE</button>
         <button onClick={() => setMultNext(3)} style={neonPink(multNext === 3)}>TRIPLE</button>
 
-        {/* Retour (flèche large vers la gauche) */}
         <button
           onClick={backspace}
           title="Retour"
@@ -2748,7 +2823,6 @@ function X01Keypad({
           onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.92)")}
           onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
         >
-          {/* Icône flèche gauche lisible */}
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="28"
@@ -2765,7 +2839,7 @@ function X01Keypad({
         </button>
       </div>
 
-      {/* Pavé 0..20 + BULL */}
+      {/* Pavé 0..20 + BULL (BULL vert) */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 6 }}>
         <button style={btnBase} onClick={() => putNumber(0)}>0</button>
         {[...Array(20)].map((_, i) => (
@@ -2773,15 +2847,17 @@ function X01Keypad({
             {i + 1}
           </button>
         ))}
-        <button style={btnBase} onClick={() => putNumber(25)}>BULL</button>
+        <button style={neonGreen} onClick={() => putNumber(25)}>BULL</button>
       </div>
 
-      {/* Actions (optionnel) */}
+      {/* Barre d’actions */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <div style={{ fontFamily: "monospace", opacity: 0.85 }}>
-          Total : <b>{total}</b> &nbsp;|&nbsp; Multi suivant :{" "}
-          <b>{multNext === 1 ? "S" : multNext === 2 ? "D" : "T"}</b>
+        {/* Total uniquement, doré */}
+        <div style={totalBox}>
+          <span style={{ opacity: 0.85 }}>Total :</span>
+          <span style={totalValue}>{total}</span>
         </div>
+
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
           {onCancel && (
             <button
@@ -2806,8 +2882,9 @@ function X01Keypad({
               border: "none",
               background: "#fbbf24",
               color: "#111",
-              fontWeight: 800,
+              fontWeight: 900,
               cursor: "pointer",
+              boxShadow: "0 0 0 1px rgba(251,191,36,.2), 0 6px 18px rgba(251,191,36,.15)",
             }}
           >
             {label}
